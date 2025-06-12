@@ -14,6 +14,8 @@
   -webkit-overflow-scrolling: none;
   overscroll-behavior: none;
   overflow: hidden;
+  isolation: isolate; /* Create a new stacking context */
+  z-index: 1; /* Ensure it's above other content */
 }
 
 .signature-canvas-title {
@@ -38,6 +40,8 @@
   overflow: hidden;
   -webkit-overflow-scrolling: none;
   overscroll-behavior: none;
+  transform: translateZ(0); /* Force GPU acceleration */
+  will-change: transform; /* Optimize for animations */
 }
 
 .signature-canvas {
@@ -52,6 +56,8 @@
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
+  transform: translateZ(0); /* Force GPU acceleration */
+  will-change: transform; /* Optimize for animations */
 }
 
 .signature-canvas-placeholder {

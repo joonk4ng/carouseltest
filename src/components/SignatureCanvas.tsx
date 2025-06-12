@@ -1,3 +1,4 @@
+// Handles the signature canvas for the PDF viewer
 import React, { useRef, useEffect, useState } from 'react';
 import '../styles/components/SignatureCanvas.css';
 
@@ -5,7 +6,7 @@ interface Point {
   x: number;
   y: number;
 }
-
+// Defines properties for the SignatureCanvas component
 interface SignatureCanvasProps {
   onSave: (signatureData: string) => void;
   onCancel: () => void;
@@ -14,6 +15,7 @@ interface SignatureCanvasProps {
   lineWidth?: number;
 }
 
+// Defines the SignatureCanvas component
 export const SignatureCanvas: React.FC<SignatureCanvasProps> = ({
   onSave,
   onCancel,
@@ -28,25 +30,25 @@ export const SignatureCanvas: React.FC<SignatureCanvasProps> = ({
   const [hasSignature, setHasSignature] = useState(false);
   const [lastPoint, setLastPoint] = useState<Point | null>(null);
 
-  // Prevent default touch behavior
   useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    // Add touch event listeners with passive: false
+    const options = { passive: false };
+    
     const preventDefault = (e: TouchEvent) => {
       e.preventDefault();
     };
 
-    const container = containerRef.current;
-    if (container) {
-      container.addEventListener('touchstart', preventDefault, { passive: false });
-      container.addEventListener('touchmove', preventDefault, { passive: false });
-      container.addEventListener('touchend', preventDefault, { passive: false });
-    }
+    container.addEventListener('touchstart', preventDefault, options);
+    container.addEventListener('touchmove', preventDefault, options);
+    container.addEventListener('touchend', preventDefault, options);
 
     return () => {
-      if (container) {
-        container.removeEventListener('touchstart', preventDefault);
-        container.removeEventListener('touchmove', preventDefault);
-        container.removeEventListener('touchend', preventDefault);
-      }
+      container.removeEventListener('touchstart', preventDefault);
+      container.removeEventListener('touchmove', preventDefault);
+      container.removeEventListener('touchend', preventDefault);
     };
   }, []);
 
@@ -108,7 +110,6 @@ export const SignatureCanvas: React.FC<SignatureCanvasProps> = ({
   };
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
     const point = 'touches' in e ? getTouchCoordinates(e as unknown as TouchEvent) : {
       x: e.nativeEvent.offsetX,
       y: e.nativeEvent.offsetY
@@ -124,7 +125,6 @@ export const SignatureCanvas: React.FC<SignatureCanvasProps> = ({
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
     if (!isDrawing || !contextRef.current || !lastPoint) return;
 
     const point = 'touches' in e ? getTouchCoordinates(e as unknown as TouchEvent) : {
@@ -161,19 +161,24 @@ export const SignatureCanvas: React.FC<SignatureCanvasProps> = ({
   const saveSignature = () => {
     if (!canvasRef.current || !hasSignature) return;
     
-    // Add metadata to the signature
-    const timestamp = new Date().toISOString();
-    const canvas = canvasRef.current;
-    const context = canvas.getContext('2d');
-    
-    if (context) {
-      context.font = '10px Arial';
-      context.fillStyle = '#999999';
-      context.fillText(`Signed: ${timestamp}`, 5, canvas.height - 5);
+    try {
+      // Add metadata to the signature
+      const timestamp = new Date().toISOString();
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d');
+      
+      if (context) {
+        context.font = '10px Arial';
+        context.fillStyle = '#999999';
+        context.fillText(`Signed: ${timestamp}`, 5, canvas.height - 5);
+      }
+      
+      const signatureData = canvas.toDataURL('image/png');
+      console.log('Saving signature...'); // Debug log
+      onSave(signatureData);
+    } catch (error) {
+      console.error('Error saving signature:', error);
     }
-    
-    const signatureData = canvas.toDataURL('image/png');
-    onSave(signatureData);
   };
 
   const handleActionSelect = (event: React.ChangeEvent<HTMLSelectElement>) => {
@@ -193,6 +198,7 @@ export const SignatureCanvas: React.FC<SignatureCanvasProps> = ({
     event.target.value = 'default';
   };
 
+  // Handles the rendering of the signature canvas
   return (
     <>
       <div className="signature-overlay" onTouchMove={e => e.preventDefault()} />
@@ -241,6 +247,10 @@ export const SignatureCanvas: React.FC<SignatureCanvasProps> = ({
               className="signature-button save-button"
               type="button"
               disabled={!hasSignature}
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                saveSignature();
+              }}
             >
               Save
             </button>

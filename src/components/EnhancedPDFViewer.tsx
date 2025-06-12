@@ -1,4 +1,4 @@
-// React component for the enhanced PDF viewer
+// React component for the enhanced PDF viewer with signature integration
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { getPDF } from '../utils/pdfStorage';
@@ -131,6 +131,31 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
     }
   }, []);
 
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    // Add touch event listeners with passive: false
+    const options = { passive: false };
+    
+    const preventDefault = (e: TouchEvent) => {
+      // Only prevent default if we're drawing on the canvas
+      if (isDrawingMode && e.target === drawCanvasRef.current) {
+        e.preventDefault();
+      }
+    };
+
+    container.addEventListener('touchstart', preventDefault, options);
+    container.addEventListener('touchmove', preventDefault, options);
+    container.addEventListener('touchend', preventDefault, options);
+
+    return () => {
+      container.removeEventListener('touchstart', preventDefault);
+      container.removeEventListener('touchmove', preventDefault);
+      container.removeEventListener('touchend', preventDefault);
+    };
+  }, [isDrawingMode]);
+
   const getTouchPos = (e: React.TouchEvent<HTMLCanvasElement>) => {
     if (!drawCanvasRef.current) return { x: 0, y: 0 };
     const touch = e.touches[0];
@@ -144,8 +169,8 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
   };
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    if (!drawCanvasRef.current) return;
-    e.preventDefault();
+    if (!drawCanvasRef.current || !isDrawingMode) return;
+    
     let pos;
     if ('touches' in e) {
       pos = getTouchPos(e as React.TouchEvent<HTMLCanvasElement>);
@@ -163,8 +188,8 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || !drawCanvasRef.current || !lastPosRef.current) return;
-    e.preventDefault();
+    if (!isDrawing || !drawCanvasRef.current || !lastPosRef.current || !isDrawingMode) return;
+    
     let currentPos;
     if ('touches' in e) {
       currentPos = getTouchPos(e as React.TouchEvent<HTMLCanvasElement>);
@@ -198,6 +223,7 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
   };
 
   const clearDrawing = () => {
+    setIsDrawingMode(false);
     const canvas = drawCanvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -205,7 +231,9 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   };
 
+  // Handles the saving of the PDF with the signature
   const handleSave = async () => {
+    setIsDrawingMode(false);
     if (!canvasRef.current || !drawCanvasRef.current || !onSave || !pdfDocRef.current) return;
 
     try {
@@ -282,9 +310,10 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
   };
 
   const handleDownload = async () => {
-    try {
-      if (!pdfDocRef.current) return;
+    setIsDrawingMode(false);
+    if (!pdfDocRef.current) return;
 
+    try {
       // Get the current PDF data
       const pdfBytes = await pdfDocRef.current.getData();
       const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
@@ -323,107 +352,112 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
   };
 
   const handlePrint = async () => {
+    setIsDrawingMode(false);
+    if (!pdfDocRef.current) {
+      throw new Error('PDF document not loaded');
+    }
+
+    if (!canvasRef.current || !containerRef.current) {
+      throw new Error('PDF viewer not properly initialized');
+    }
+
+    // Create and append print-specific styles
+    const style = document.createElement('style');
+    style.id = 'pdf-print-style';
+    style.textContent = `
+      @media print {
+        body * {
+          visibility: hidden !important;
+        }
+        .enhanced-pdf-viewer {
+          position: fixed !important;
+          left: 0 !important;
+          top: 0 !important;
+          width: 100% !important;
+          height: auto !important;
+          overflow: visible !important;
+        }
+        .enhanced-pdf-viewer .toolbar,
+        .enhanced-pdf-viewer .draw-canvas {
+          display: none !important;
+        }
+        .enhanced-pdf-viewer .pdf-canvas {
+          visibility: visible !important;
+          width: 100% !important;
+          height: auto !important;
+          display: block !important;
+          page-break-after: avoid !important;
+        }
+        @page {
+          size: auto;
+          margin: 0mm;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+
+    // Store current scroll position and zoom
+    const container = containerRef.current;
+    const originalScroll = {
+      top: container.scrollTop,
+      left: container.scrollLeft
+    };
+
     try {
-      if (!pdfDocRef.current) {
-        throw new Error('PDF document not loaded');
+      // Ensure the PDF is rendered at optimal print quality
+      const page = await pdfDocRef.current.getPage(1);
+      const viewport = page.getViewport({ scale: 2.0 }); // Higher scale for print quality
+      
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d');
+      
+      if (!context) {
+        throw new Error('Could not get canvas context');
       }
 
-      if (!canvasRef.current || !containerRef.current) {
-        throw new Error('PDF viewer not properly initialized');
+      // Update canvas dimensions for print
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+
+      // Render at high quality
+      await page.render({
+        canvasContext: context,
+        viewport: viewport
+      }).promise;
+
+      // Print
+      window.print();
+
+    } finally {
+      // Clean up print styles
+      const printStyle = document.getElementById('pdf-print-style');
+      if (printStyle) {
+        printStyle.remove();
       }
 
-      // Create and append print-specific styles
-      const style = document.createElement('style');
-      style.id = 'pdf-print-style';
-      style.textContent = `
-        @media print {
-          body * {
-            visibility: hidden !important;
-          }
-          .enhanced-pdf-viewer {
-            position: fixed !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 100% !important;
-            height: auto !important;
-            overflow: visible !important;
-          }
-          .enhanced-pdf-viewer .toolbar,
-          .enhanced-pdf-viewer .draw-canvas {
-            display: none !important;
-          }
-          .enhanced-pdf-viewer .pdf-canvas {
-            visibility: visible !important;
-            width: 100% !important;
-            height: auto !important;
-            display: block !important;
-            page-break-after: avoid !important;
-          }
-          @page {
-            size: auto;
-            margin: 0mm;
-          }
-        }
-      `;
-      document.head.appendChild(style);
-
-      // Store current scroll position and zoom
-      const container = containerRef.current;
-      const originalScroll = {
-        top: container.scrollTop,
-        left: container.scrollLeft
-      };
-
-      try {
-        // Ensure the PDF is rendered at optimal print quality
-        const page = await pdfDocRef.current.getPage(1);
-        const viewport = page.getViewport({ scale: 2.0 }); // Higher scale for print quality
-        
-        const canvas = canvasRef.current;
-        const context = canvas.getContext('2d');
-        
-        if (!context) {
-          throw new Error('Could not get canvas context');
-        }
-
-        // Update canvas dimensions for print
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
-
-        // Render at high quality
-        await page.render({
-          canvasContext: context,
-          viewport: viewport
-        }).promise;
-
-        // Print
-        window.print();
-
-      } finally {
-        // Clean up print styles
-        const printStyle = document.getElementById('pdf-print-style');
-        if (printStyle) {
-          printStyle.remove();
-        }
-
-        // Restore original scroll position
-        if (container) {
-          container.scrollTop = originalScroll.top;
-          container.scrollLeft = originalScroll.left;
-        }
-
-        // Re-render at normal quality if needed
-        renderPDF(pdfDocRef.current);
+      // Restore original scroll position
+      if (container) {
+        container.scrollTop = originalScroll.top;
+        container.scrollLeft = originalScroll.left;
       }
 
-    } catch (err) {
-      console.error('Error printing PDF:', err);
-      setError(err instanceof Error ? err.message : 'Failed to print PDF.');
+      // Re-render at normal quality if needed
+      renderPDF(pdfDocRef.current);
     }
   };
 
   const toggleDrawingMode = () => {
-    setIsDrawingMode(!isDrawingMode);
+    setIsDrawingMode(prev => !prev);
+    // Clear any existing drawing when toggling mode
+    if (drawCanvasRef.current) {
+      const ctx = drawCanvasRef.current.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, drawCanvasRef.current.width, drawCanvasRef.current.height);
+      }
+    }
+    // Reset drawing state
+    setIsDrawing(false);
+    lastPosRef.current = null;
   };
 
   useEffect(() => {
@@ -491,8 +525,8 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
   }, [pdfId, renderPDF]);
 
   return (
-    <div className={`enhanced-pdf-viewer ${className || ''}`} style={style}>
-      <div className="canvas-container" ref={containerRef}>
+    <div className={`enhanced-pdf-viewer ${className || ''}`} style={style} ref={containerRef}>
+      <div className="canvas-container">
         {error && <div className="error-message">{error}</div>}
         {isLoading && <div className="loading">Loading PDF...</div>}
         <canvas ref={canvasRef} className="pdf-canvas" />
@@ -511,8 +545,8 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
               onTouchEnd={stopDrawing}
             />
             <div className="toolbar">
-              <button 
-                onClick={toggleDrawingMode} 
+              <button
+                onClick={toggleDrawingMode}
                 className={`icon-btn draw-btn ${isDrawingMode ? 'active' : ''}`} 
                 title="Draw"
               >
@@ -552,16 +586,14 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
             value={drawColor}
             onChange={(e) => setDrawColor(e.target.value)}
             title="Drawing Color"
-            className="color-picker"
           />
           <input
             type="range"
             min="1"
-            max="10"
+            max="20"
             value={drawWidth}
             onChange={(e) => setDrawWidth(Number(e.target.value))}
             title="Drawing Width"
-            className="width-slider"
           />
         </div>
       )}

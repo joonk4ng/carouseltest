@@ -1,0 +1,54 @@
+.signature-page {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: white;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.signature-page-content {
+  width: 100%;
+  max-width: 800px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.signature-page-content h2 {
+  margin-bottom: 20px;
+  color: var(--text-color);
+}
+
+.signature-page-canvas {
+  width: 100%;
+  height: calc(100% - 100px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Mobile styles */
+@media screen and (max-width: 768px) {
+  .signature-page-content {
+    padding: 10px;
+  }
+
+  .signature-page-content h2 {
+    font-size: 1.2rem;
+    margin-bottom: 15px;
+  }
+
+  .signature-page-canvas {
+    height: calc(100% - 80px);
+  }
+} 
