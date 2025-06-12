@@ -65,10 +65,10 @@
 }
 
 .ctr-table {
+  table-layout: fixed;
   width: 100%;
   border-collapse: collapse;
   margin-top: 1rem;
-  table-layout: fixed;
 }
 
 .ctr-th {
@@ -80,14 +80,29 @@
   white-space: nowrap;
 }
 
-.ctr-th.name {
-  width: 25%;
-  min-width: 120px;
+.ctr-th.name-col, .ctr-td.name-col {
+  min-width: 60px;
+  max-width: 90px;
+  width: 80px;
+  white-space: normal;
+  word-break: break-word;
+  text-align: left;
+  padding: 4px 2px;
+}
+
+.ctr-th.class-col, .ctr-td.class-col {
+  width: 36px;
+  min-width: 30px;
+  max-width: 40px;
   text-align: center;
 }
 
-.ctr-th.class {
+.ctr-th.time-col, .ctr-td.time-col {
+  width: 60px;
+  min-width: 50px;
+  max-width: 80px;
   text-align: center;
+  font-size: 14px;
 }
 
 .ctr-td {
@@ -113,14 +128,30 @@
 
 /* Mobile optimizations */
 @media (max-width: 768px) {
-  .ctr-th.name {
-    width: 20%;
-    min-width: 100px;
+  .ctr-th.name-col, .ctr-td.name-col {
+    min-width: 48px;
+    max-width: 70px;
+    width: 60px;
+    font-size: 12px;
+    padding: 2px 1px;
+  }
+  .ctr-th.class-col, .ctr-td.class-col {
+    width: 24px;
+    min-width: 20px;
+    max-width: 32px;
+    font-size: 11px;
+    padding: 4px 1px;
+  }
+  .ctr-th.time-col, .ctr-td.time-col {
+    width: 48px;
+    min-width: 36px;
+    max-width: 60px;
+    font-size: 13px;
+    padding: 4px 1px;
   }
 
   .ctr-th {
     padding: 6px 4px;
-    font-size: 12px;
   }
 
   .ctr-td {
@@ -164,12 +195,12 @@
 /* Specific column widths */
 .ctr-table th:nth-child(1), /* Name */
 .ctr-table td:nth-child(1) {
-  width: 35%;
+  width: 30%;
 }
 
 .ctr-table th:nth-child(2), /* Class */
 .ctr-table td:nth-child(2) {
-  width: 15%;
+  width: 7%;
 }
 
 .ctr-table th:nth-child(3), /* ON 1 */
@@ -180,7 +211,7 @@
 .ctr-table td:nth-child(5),
 .ctr-table th:nth-child(6), /* OFF 2 */
 .ctr-table td:nth-child(6) {
-  width: 12.5%;
+  width: 18%;
 }
 
 .ctr-table th:last-child, /* Delete button */
@@ -206,12 +237,12 @@
   /* Adjust column widths for mobile */
   .ctr-table th:nth-child(1), /* Name */
   .ctr-table td:nth-child(1) {
-    width: 40%;
+    width: 30%;
   }
 
   .ctr-table th:nth-child(2), /* Class */
   .ctr-table td:nth-child(2) {
-    width: 12%;
+    width: 7%;
   }
 
   .ctr-table th:nth-child(3), /* ON 1 */
@@ -222,7 +253,7 @@
   .ctr-table td:nth-child(5),
   .ctr-table th:nth-child(6), /* OFF 2 */
   .ctr-table td:nth-child(6) {
-    width: 12.5%;
+    width: 14%;
   }
 
   .ctr-table th:last-child, /* Delete button */
@@ -613,7 +644,7 @@
   }
 }
 
-.modal-overlay {
+.modal {
   position: fixed;
   top: 0;
   left: 0;
@@ -621,40 +652,85 @@
   bottom: 0;
   background-color: rgba(0, 0, 0, 0.5);
   display: flex;
-  justify-content: center;
   align-items: center;
-  z-index: 1000;
+  justify-content: center;
+  z-index: 9997;
+  touch-action: none;
+  -webkit-overflow-scrolling: none;
+  overscroll-behavior: none;
+  overflow: hidden;
 }
 
 .modal-content {
   background-color: white;
+  padding: 20px;
   border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   position: relative;
-  max-width: 90vw;
+  width: 95%;
+  max-width: 1200px;
   max-height: 90vh;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .pdf-modal {
-  width: 90vw;
+  width: 95vw;
   height: 90vh;
+  padding: 0;
+  background-color: #f5f5f5;
+  position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
-.modal-close {
+.modal-close-btn {
   position: absolute;
   top: 10px;
   right: 10px;
-  background: none;
+  width: 30px;
+  height: 30px;
   border: none;
-  font-size: 24px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  font-size: 20px;
+  line-height: 1;
   cursor: pointer;
-  color: #666;
-  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.modal-close:hover {
-  color: #000;
+.modal-close-btn:hover {
+  background: white;
+}
+
+@media (max-width: 768px) {
+  .modal-content {
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+    border-radius: 0;
+    margin: 0;
+    padding: 10px;
+  }
+
+  .pdf-modal {
+    width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+  }
+
+  .modal-close-btn {
+    top: 5px;
+    right: 5px;
+    width: 36px;
+    height: 36px;
+    font-size: 24px;
+  }
 }
 
 .ctr-pdf-section {
@@ -698,47 +774,57 @@
   background-color: #2e7d32;
 }
 
-.modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
+/* Name column: allow wrapping and two lines */
+.ctr-td.name-col, .ctr-th.name-col {
+  white-space: normal;
+  word-break: break-word;
+  max-width: 90px;
+  min-width: 60px;
+  line-height: 1.2;
+  padding: 6px 4px;
 }
 
-.modal-content {
-  background-color: white;
-  padding: 20px;
-  border-radius: 8px;
-  position: relative;
-  width: 90%;
-  height: 90%;
-  max-width: 1200px;
-  overflow: hidden;
+/* Render first and last name on separate lines if possible */
+.ctr-td.name-col span {
+  display: block;
 }
 
-.pdf-modal {
-  display: flex;
-  flex-direction: column;
+/* Classification column: shrink width */
+.ctr-td.class-col, .ctr-th.class-col {
+  max-width: 36px;
+  min-width: 24px;
+  width: 7%;
+  white-space: nowrap;
+  padding: 6px 2px;
+  text-align: center;
 }
 
-.modal-close-btn {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: #666;
-  z-index: 1;
+/* Time columns: give more space */
+.ctr-td.time-col, .ctr-th.time-col {
+  min-width: 48px;
+  max-width: none;
+  padding: 6px 2px;
+  text-align: center;
 }
 
-.modal-close-btn:hover {
-  color: #000;
+@media (max-width: 768px) {
+  .ctr-td.name-col, .ctr-th.name-col {
+    max-width: 70px;
+    min-width: 40px;
+    font-size: 12px;
+    padding: 4px 2px;
+  }
+  .ctr-td.class-col, .ctr-th.class-col {
+    max-width: 30px;
+    min-width: 20px;
+    width: 7%;
+    font-size: 11px;
+    padding: 4px 1px;
+  }
+  .ctr-td.time-col, .ctr-th.time-col {
+    min-width: 36px;
+    max-width: none;
+    font-size: 12px;
+    padding: 4px 1px;
+  }
 } 

@@ -1,0 +1,105 @@
+/* Desktop SignatureCanvas styles */
+.signature-canvas-container {
+  max-width: 600px;
+  margin: var(--desktop-spacing) auto;
+  padding: var(--desktop-spacing);
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.signature-canvas-title {
+  font-size: 24px;
+  color: var(--text-color);
+  margin-bottom: var(--desktop-spacing);
+  text-align: center;
+}
+
+.signature-canvas-wrapper {
+  position: relative;
+  width: 100%;
+  height: 300px;
+  border: 2px dashed var(--border-color);
+  border-radius: 8px;
+  margin-bottom: var(--desktop-spacing);
+  background: #f9f9f9;
+}
+
+.signature-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}
+
+.signature-canvas-placeholder {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #999;
+  font-size: var(--desktop-font-size);
+  text-align: center;
+  pointer-events: none;
+}
+
+.signature-canvas-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.signature-canvas-actions button {
+  padding: 12px 24px;
+  font-size: var(--desktop-font-size);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background-color: var(--secondary-color);
+  color: white;
+}
+
+.signature-canvas-actions button:hover {
+  background-color: #1565c0;
+}
+
+.signature-canvas-actions .clear-btn {
+  background-color: #dc3545;
+}
+
+.signature-canvas-actions .clear-btn:hover {
+  background-color: #c82333;
+}
+
+.signature-canvas-actions .save-btn {
+  background-color: #28a745;
+}
+
+.signature-canvas-actions .save-btn:hover {
+  background-color: #218838;
+}
+
+.signature-canvas-actions button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+.signature-canvas-preview {
+  margin-top: var(--desktop-spacing);
+  padding: var(--desktop-spacing);
+  background: #f5f5f5;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.signature-canvas-preview img {
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: white;
+  padding: 8px;
+} 

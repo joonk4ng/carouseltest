@@ -1,7 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import * as pdfjsLib from 'pdfjs-dist';
-import './styles.css';
+import './utils/polyfills';  // Import all polyfills
+import './styles/main.css';  // Import our new main styles
 import App from './App';
 
 // Configure PDF.js worker

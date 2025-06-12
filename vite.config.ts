@@ -57,8 +57,8 @@ export default defineConfig({
       filter: /\.(js|css|html|svg|json|txt)$/i,
     }),
   ],
-  // sets base public path for app - from root path
-  base: './',
+  // sets base public path for app - using root path for user site
+  base: '/',
   // configures development server
   server: {
     open: true,
@@ -132,12 +132,18 @@ export default defineConfig({
             return 'assets/[name].js';
           }
           return 'assets/[name]-[hash].js';
-        }
+        },
+        // Ensure proper MIME types
+        format: 'es'
       }
     },
     // enables source map generation and debugs minified production code by mapping it back to source
     sourcemap: true,
     chunkSizeWarningLimit: 1000,
+    // Add additional build options
+    modulePreload: {
+      polyfill: true
+    }
   },
   // specifies directory for static assets
   publicDir: 'public',
@@ -147,7 +153,8 @@ export default defineConfig({
     alias: {
       'react': resolve(__dirname, 'node_modules/react'),
       'react-dom': resolve(__dirname, 'node_modules/react-dom'),
-      'pdfjs-dist': resolve(__dirname, 'node_modules/pdfjs-dist')
+      'pdfjs-dist': resolve(__dirname, 'node_modules/pdfjs-dist'),
+      'buffer': resolve(__dirname, 'node_modules/buffer')
     },
   },
   // configures dependency pre-bundling for improved performance
@@ -155,7 +162,8 @@ export default defineConfig({
     include: [
       'react', 
       'react-dom', 
-      'pdfjs-dist'
+      'pdfjs-dist',
+      'buffer'
     ],
     exclude: []
   },
@@ -165,5 +173,10 @@ export default defineConfig({
       localsConvention: 'camelCase'
     },
     devSourcemap: true
+  },
+  define: {
+    'global': 'globalThis',
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV),
+    'Buffer': 'Buffer'
   }
 });

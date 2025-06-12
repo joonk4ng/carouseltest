@@ -1,15 +1,25 @@
 import React, { useEffect, useState } from 'react';
 import { getPDF } from '../utils/pdfStorage';
-import '../styles/PDFPreviewViewer.css';
+import '../styles/components/desktop/PDFPreviewViewer.css';
+import '../styles/components/mobile/PDFPreviewViewer.css';
 
 interface PDFPreviewViewerProps {
   pdfId: string;
   onLoad?: () => void;
   className?: string;
   style?: React.CSSProperties;
+  onClearDrawing?: () => void;
+  onSaveWithSignature?: () => void;
 }
 
-const PDFPreviewViewer: React.FC<PDFPreviewViewerProps> = ({ pdfId, onLoad, className, style }) => {
+const PDFPreviewViewer: React.FC<PDFPreviewViewerProps> = ({ 
+  pdfId, 
+  onLoad, 
+  className, 
+  style,
+  onClearDrawing,
+  onSaveWithSignature 
+}) => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -141,6 +151,26 @@ const PDFPreviewViewer: React.FC<PDFPreviewViewerProps> = ({ pdfId, onLoad, clas
     }
   };
 
+  const handleActionSelect = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const action = event.target.value;
+    switch (action) {
+      case 'clear':
+        onClearDrawing?.();
+        break;
+      case 'save':
+        onSaveWithSignature?.();
+        break;
+      case 'download':
+        handleDownloadPDF();
+        break;
+      case 'print':
+        handlePrint();
+        break;
+    }
+    // Reset the select to default option
+    event.target.value = 'default';
+  };
+
   if (loading) {
     return <div>Loading preview...</div>;
   }
@@ -150,57 +180,52 @@ const PDFPreviewViewer: React.FC<PDFPreviewViewerProps> = ({ pdfId, onLoad, clas
   }
 
   return (
-    <div 
-      className={`pdf-preview-viewer ${className || ''}`}
-      style={{ 
-        width: '100%', 
-        height: '100%', 
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        ...style 
-      }}
-    >
+    <div className={`pdf-preview-viewer ${className || ''}`}>
       {previewUrl && (
         <>
-          <img 
-            src={previewUrl} 
-            alt="PDF Preview" 
-            style={{ 
-              maxWidth: '100%', 
-              maxHeight: 'calc(100% - 50px)', // Leave space for the buttons
-              objectFit: 'contain' 
-            }} 
-          />
-          <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-            <button 
-              onClick={handleDownloadPDF}
-              className="download-pdf-button"
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#007bff',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
+          <img src={previewUrl} alt="PDF Preview" />
+          <div className="pdf-preview-actions">
+            <select 
+              className="action-select"
+              onChange={handleActionSelect}
+              defaultValue="default"
             >
-              Download PDF
-            </button>
-            <button 
-              onClick={handlePrint}
-              className="print-pdf-button"
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#28a745',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              Print PDF
-            </button>
+              <option value="default" disabled>Select an action...</option>
+              {onClearDrawing && <option value="clear">Clear Drawing</option>}
+              {onSaveWithSignature && <option value="save">Save with Signature</option>}
+              <option value="download">Download PDF</option>
+              <option value="print">Print PDF</option>
+            </select>
+            <div className="button-bar">
+              {onClearDrawing && (
+                <button 
+                  onClick={onClearDrawing}
+                  className="clear-drawing-button"
+                >
+                  Clear Drawing
+                </button>
+              )}
+              {onSaveWithSignature && (
+                <button 
+                  onClick={onSaveWithSignature}
+                  className="save-signature-button"
+                >
+                  Save with Signature
+                </button>
+              )}
+              <button 
+                onClick={handleDownloadPDF}
+                className="download-pdf-button"
+              >
+                Download PDF
+              </button>
+              <button 
+                onClick={handlePrint}
+                className="print-pdf-button"
+              >
+                Print PDF
+              </button>
+            </div>
           </div>
         </>
       )}

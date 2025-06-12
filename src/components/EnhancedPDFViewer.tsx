@@ -68,6 +68,7 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
   const [signedPdfBlob, setSignedPdfBlob] = useState<Blob | null>(null);
   const lastPosRef = useRef<{ x: number; y: number } | null>(null);
   const renderTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [isDrawingMode, setIsDrawingMode] = useState(false);
 
   const renderPDF = useCallback(async (pdfDoc: pdfjsLib.PDFDocumentProxy) => {
     if (!canvasRef.current || !drawCanvasRef.current) return;
@@ -130,32 +131,55 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
     }
   }, []);
 
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!drawCanvasRef.current) return;
+  const getTouchPos = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (!drawCanvasRef.current) return { x: 0, y: 0 };
+    const touch = e.touches[0];
     const rect = drawCanvasRef.current.getBoundingClientRect();
     const scaleX = drawCanvasRef.current.width / rect.width;
     const scaleY = drawCanvasRef.current.height / rect.height;
-    lastPosRef.current = {
-      x: (e.clientX - rect.left) * scaleX,
-      y: (e.clientY - rect.top) * scaleY
+    return {
+      x: (touch.clientX - rect.left) * scaleX,
+      y: (touch.clientY - rect.top) * scaleY
     };
+  };
+
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!drawCanvasRef.current) return;
+    e.preventDefault();
+    let pos;
+    if ('touches' in e) {
+      pos = getTouchPos(e as React.TouchEvent<HTMLCanvasElement>);
+    } else {
+      const rect = drawCanvasRef.current.getBoundingClientRect();
+      const scaleX = drawCanvasRef.current.width / rect.width;
+      const scaleY = drawCanvasRef.current.height / rect.height;
+      pos = {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY
+      };
+    }
+    lastPosRef.current = pos;
     setIsDrawing(true);
   };
 
-  const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     if (!isDrawing || !drawCanvasRef.current || !lastPosRef.current) return;
+    e.preventDefault();
+    let currentPos;
+    if ('touches' in e) {
+      currentPos = getTouchPos(e as React.TouchEvent<HTMLCanvasElement>);
+    } else {
+      const rect = drawCanvasRef.current.getBoundingClientRect();
+      const scaleX = drawCanvasRef.current.width / rect.width;
+      const scaleY = drawCanvasRef.current.height / rect.height;
+      currentPos = {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY
+      };
+    }
 
-    const canvas = drawCanvasRef.current;
-    const ctx = canvas.getContext('2d');
+    const ctx = drawCanvasRef.current.getContext('2d');
     if (!ctx) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const currentPos = {
-      x: (e.clientX - rect.left) * scaleX,
-      y: (e.clientY - rect.top) * scaleY
-    };
 
     ctx.beginPath();
     ctx.strokeStyle = drawColor;
@@ -398,6 +422,10 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
     }
   };
 
+  const toggleDrawingMode = () => {
+    setIsDrawingMode(!isDrawingMode);
+  };
+
   useEffect(() => {
     let mounted = true;
     let currentPdf: pdfjsLib.PDFDocumentProxy | null = null;
@@ -464,13 +492,67 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
 
   return (
     <div className={`enhanced-pdf-viewer ${className || ''}`} style={style}>
+      <div className="canvas-container" ref={containerRef}>
+        {error && <div className="error-message">{error}</div>}
+        {isLoading && <div className="loading">Loading PDF...</div>}
+        <canvas ref={canvasRef} className="pdf-canvas" />
+        {!readOnly && (
+          <>
+            <canvas
+              ref={drawCanvasRef}
+              className="draw-canvas"
+              style={{ pointerEvents: isDrawingMode ? 'auto' : 'none' }}
+              onMouseDown={startDrawing}
+              onMouseMove={draw}
+              onMouseUp={stopDrawing}
+              onMouseLeave={stopDrawing}
+              onTouchStart={startDrawing}
+              onTouchMove={draw}
+              onTouchEnd={stopDrawing}
+            />
+            <div className="toolbar">
+              <button 
+                onClick={toggleDrawingMode} 
+                className={`icon-btn draw-btn ${isDrawingMode ? 'active' : ''}`} 
+                title="Draw"
+              >
+                <svg viewBox="0 0 24 24" width="24" height="24">
+                  <path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                </svg>
+              </button>
+              <button onClick={clearDrawing} className="icon-btn clear-btn" title="Clear Drawing">
+                <svg viewBox="0 0 24 24" width="24" height="24">
+                  <path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                </svg>
+              </button>
+              <button onClick={handleSave} className="icon-btn save-btn" title="Save with Signature">
+                <svg viewBox="0 0 24 24" width="24" height="24">
+                  <path fill="currentColor" d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/>
+                </svg>
+              </button>
+              <button onClick={handleDownload} className="icon-btn download-btn" title="Download PDF">
+                <svg viewBox="0 0 24 24" width="24" height="24">
+                  <path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                </svg>
+              </button>
+              <button onClick={handlePrint} className="icon-btn print-btn" title="Print">
+                <svg viewBox="0 0 24 24" width="24" height="24">
+                  <path fill="currentColor" d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/>
+                </svg>
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+
       {!readOnly && (
-        <div className="toolbar">
+        <div className="drawing-controls">
           <input
             type="color"
             value={drawColor}
             onChange={(e) => setDrawColor(e.target.value)}
             title="Drawing Color"
+            className="color-picker"
           />
           <input
             type="range"
@@ -479,57 +561,10 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
             value={drawWidth}
             onChange={(e) => setDrawWidth(Number(e.target.value))}
             title="Drawing Width"
+            className="width-slider"
           />
-          <button onClick={clearDrawing} className="clear-btn">Clear Drawing</button>
-          <button onClick={handleSave} className="save-btn">Save with Signature</button>
-          <button 
-            onClick={handleDownload} 
-            className="download-btn"
-            style={{
-              backgroundColor: '#28a745',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              padding: '8px 16px',
-              cursor: 'pointer',
-              marginLeft: '8px'
-            }}
-          >
-            Download PDF
-          </button>
-          <button 
-            onClick={handlePrint} 
-            className="print-btn"
-            style={{
-              backgroundColor: '#007bff',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              padding: '8px 16px',
-              cursor: 'pointer',
-              marginLeft: '8px'
-            }}
-          >
-            Print PDF
-          </button>
         </div>
       )}
-
-      <div className="canvas-container" ref={containerRef}>
-        {error && <div className="error-message">{error}</div>}
-        {isLoading && <div className="loading">Loading PDF...</div>}
-        <canvas ref={canvasRef} className="pdf-canvas" />
-        {!readOnly && (
-          <canvas
-            ref={drawCanvasRef}
-            className="draw-canvas"
-            onMouseDown={startDrawing}
-            onMouseMove={draw}
-            onMouseUp={stopDrawing}
-            onMouseLeave={stopDrawing}
-          />
-        )}
-      </div>
     </div>
   );
 };

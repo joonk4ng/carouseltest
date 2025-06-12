@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { defaultData } from '../data/defaultData';
 import '../styles/MainTable.css';
 import { fillCTRPDF } from '../utils/fillCTRPDF';
-import * as XLSX from 'xlsx';
 import { fillExcelTemplate } from '../utils/fillExcelTemplate';
 import { generateExportFilename } from '../utils/filenameGenerator';
 import { ctrDataService } from '../utils/CTRDataService';
@@ -14,6 +13,10 @@ import { DateCalendar } from './DateCalendar';
 import PDFGenerationViewer from './PDFGenerationViewer';
 import EnhancedPDFViewer from './EnhancedPDFViewer';
 import { storePDF } from '../utils/pdfStorage';
+import ExcelJS from 'exceljs';
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import type { Workbook } from 'xlsx-populate';
+import XLSX from 'xlsx';
 
 // TypeScript interfaces
 interface EditingCell {
@@ -24,7 +27,7 @@ interface EditingCell {
 
 interface NotificationState {
   message: string;
-  type: 'success' | 'info' | 'warning' | 'error';
+  type: 'info' | 'success' | 'warning' | 'error';
   show: boolean;
 }
 
@@ -37,87 +40,6 @@ function saveData(data: CrewMember[]) {
 function loadData(): CrewMember[] {
   // No longer needed since we're using IndexedDB
   return defaultData;
-}
-
-function toExcelTemplate(data: CrewMember[], crewInfo: CrewInfo, days: string[]): XLSX.WorkBook {
-  // Create a blank worksheet with enough rows/cols
-  const ws: XLSX.WorkSheet = {};
-  // Set up the data array for AoA
-  const aoa: any[][] = Array.from({ length: 30 }, () => Array(9).fill(""));
-
-  // Header info
-  aoa[0][1] = crewInfo.crewName || ""; // B1
-  aoa[0][7] = crewInfo.crewNumber || ""; // H1
-  aoa[1][1] = crewInfo.fireName || ""; // B2
-  aoa[1][7] = crewInfo.fireNumber || ""; // H2
-
-  // Date headers
-  aoa[3][5] = days[0] || ""; // F4
-  aoa[3][7] = days[1] || ""; // H4
-
-  // Yellow highlight row (row 6, E-H)
-  for (let col = 4; col <= 7; col++) aoa[5][col] = "";
-
-  // Table rows (6-25)
-  for (let i = 0; i < 20; i++) {
-    const row = data[i] || { name: "", classification: "", days: [{ on: "", off: "" }, { on: "", off: "" }] };
-    const r = 5 + i; // Excel row 6 is index 5
-    aoa[r][1] = row.name || ""; // B
-    aoa[r][2] = ""; // C (merged with B)
-    aoa[r][3] = row.classification || ""; // D
-    aoa[r][4] = row.days[0]?.on || ""; // E (date 1 ON)
-    aoa[r][5] = row.days[0]?.off || ""; // F (date 1 OFF)
-    aoa[r][6] = row.days[1]?.on || ""; // G (date 2 ON)
-    aoa[r][7] = row.days[1]?.off || ""; // H (date 2 OFF)
-  }
-
-  // Calculate total hours
-  const totalHours = calculateTotalHours(data);
-
-  // Total Hours row (row 29)
-  aoa[28][1] = "Total Hours";
-  aoa[28][2] = totalHours;
-
-  // Write AoA to worksheet
-  XLSX.utils.sheet_add_aoa(ws, aoa);
-
-  // Merge B & C for names
-  for (let r = 6; r <= 25; r++) {
-    if (!ws['!merges']) ws['!merges'] = [];
-    ws['!merges'].push({ s: { r: r - 1, c: 1 }, e: { r: r - 1, c: 2 } });
-  }
-
-  // Set column widths
-  ws['!cols'] = [
-    { wpx: 10 },   // A
-    { wpx: 120 },  // B (Name)
-    { wpx: 120 },  // C (Name merged)
-    { wpx: 60 },   // D (Class)
-    { wpx: 50 },   // E (ON 1)
-    { wpx: 50 },   // F (OFF 1)
-    { wpx: 50 },   // G (ON 2)
-    { wpx: 50 },   // H (OFF 2)
-  ];
-
-  // Highlight row 6, E-H (yellow)
-  for (let c = 4; c <= 7; c++) {
-    const cell = XLSX.utils.encode_cell({ r: 5, c });
-    if (!ws[cell]) ws[cell] = { t: 's', v: '' };
-    ws[cell].s = { fill: { fgColor: { rgb: 'FFFF00' } } };
-  }
-
-  // Set time format for ON/OFF cells
-  for (let r = 6; r <= 25; r++) {
-    for (let c of [4, 5, 6, 7]) {
-      const cell = XLSX.utils.encode_cell({ r: r - 1, c });
-      if (ws[cell]) ws[cell].z = 'h:mm';
-    }
-  }
-
-  // Create workbook
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Crew Time Report");
-  return wb;
 }
 
 // Add deep comparison utility
@@ -140,6 +62,8 @@ function deepEqual(obj1: any, obj2: any): boolean {
   return true;
 }
 
+const isTouchDevice = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+
 export default function MainTable() {
   const [data, setData] = useState<CrewMember[]>(defaultData);
   
@@ -154,7 +78,6 @@ export default function MainTable() {
     fireNumber: ''
   });
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
-  const [lastTap, setLastTap] = useState<number>(0);
   const [savedDates, setSavedDates] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -420,14 +343,6 @@ export default function MainTable() {
     }
   };
 
-  const handleCellDoubleTap = (rowIdx: number, field: string, dayIdx?: number) => {
-    const now = Date.now();
-    if (now - lastTap < 300) { // Double tap detected
-      setEditingCell({ row: rowIdx, field, dayIdx });
-    }
-    setLastTap(now);
-  };
-
   const handleCellDoubleClick = (rowIdx: number, field: string, dayIdx?: number) => {
     setEditingCell({ row: rowIdx, field, dayIdx });
   };
@@ -585,38 +500,41 @@ export default function MainTable() {
 
   const handleExportExcel = async () => {
     try {
-      // Validate required data before attempting Excel generation
-      if (!days[0] || !days[1]) {
-        showNotification('Please select both dates before generating Excel.', 'warning');
-        return;
-      }
-
-      if (!crewInfo.crewNumber || !crewInfo.fireName || !crewInfo.fireNumber) {
-        showNotification('Please fill in all crew and fire information before generating Excel.', 'warning');
-        return;
-      }
-
-      // Check if there's any crew member data
-      const hasCrewData = data.some(member => 
-        member.name && member.classification && 
-        member.days.some(day => day.on || day.off)
-      );
-
-      if (!hasCrewData) {
-        showNotification('Please enter at least one crew member\'s information before generating Excel.', 'warning');
+      if (!data || data.length === 0) {
+        showNotification('No data to export', 'warning');
         return;
       }
 
       showNotification('Generating Excel...', 'info');
       
-      const wb = await fillExcelTemplate(data, crewInfo, days, '/CTR_Template.xlsx');
-      XLSX.writeFile(wb, generateExportFilename({
+      const workbook = await fillExcelTemplate(
+        data,
+        crewInfo,
+        days
+      );
+
+      // Convert workbook to buffer
+      const buffer = await workbook.xlsx.writeBuffer();
+
+      // Create blob and download
+      const blob = new Blob([buffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = generateExportFilename({
         date: days[0],
         crewNumber: crewInfo.crewNumber,
         fireName: crewInfo.fireName,
         fireNumber: crewInfo.fireNumber,
         type: 'Excel'
-      }));
+      });
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
       showNotification('Excel file generated successfully!', 'success');
     } catch (error) {
       console.error('Error generating Excel:', error);
@@ -663,12 +581,34 @@ export default function MainTable() {
     if (!file) return;
     
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       try {
         const data = evt.target?.result;
-        const workbook = XLSX.read(data, { type: 'binary' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
+        if (!data) return;
+
+        // Create a new workbook and load the uploaded file
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(data as ArrayBuffer);
+        
+        // Try different ways to get the worksheet
+        let worksheet = workbook.getWorksheet(1); // Try index 1 first
+        if (!worksheet) {
+          worksheet = workbook.getWorksheet('Sheet1'); // Try 'Sheet1' name
+        }
+        if (!worksheet) {
+          worksheet = workbook.worksheets[0]; // Try first worksheet
+        }
+        if (!worksheet) {
+          console.error('Available worksheets:', workbook.worksheets.map(ws => ({ name: ws.name, id: ws.id })));
+          throw new Error('No worksheet found in the uploaded Excel file');
+        }
+
+        console.log('Found worksheet:', {
+          name: worksheet.name,
+          id: worksheet.id,
+          rowCount: worksheet.rowCount,
+          columnCount: worksheet.columnCount
+        });
         
         // Use the mapping utility to extract data
         const { crewInfo: importedCrewInfo, crewMembers } = mapExcelToData(worksheet);
@@ -678,8 +618,8 @@ export default function MainTable() {
         setData(crewMembers);
         
         // Extract dates from the first crew member's days
-        if (crewMembers.length > 0) {
-          const dates = crewMembers[0].days.map(d => d.date);
+        if (crewMembers.length > 0 && crewMembers[0].days) {
+          const dates = crewMembers[0].days.map(d => d.date || '');
           setDays(dates);
           setDayCount(dates.length);
         }
@@ -688,10 +628,10 @@ export default function MainTable() {
         showNotification('Excel file imported successfully', 'success');
       } catch (error) {
         console.error('Error importing Excel file:', error);
-        showNotification('Error importing Excel file. Please check the file format.', 'error');
+        showNotification('Error importing Excel file. Please check the file format and try again.', 'error');
       }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   };
 
   const handleCopyToNextDay = async () => {
@@ -921,7 +861,7 @@ export default function MainTable() {
           <thead>
             <tr>
               <th className="ctr-th name" rowSpan={2}>NAME</th>
-              <th className="ctr-th class" rowSpan={2}>CLASS</th>
+              <th className="ctr-th class" rowSpan={2}>JOB TITLE</th>
               {days.map((date, i) => (
                 <th className="ctr-th date" colSpan={2} key={i} style={{ textAlign: 'center' }}>
                   DATE<br />
@@ -955,7 +895,7 @@ export default function MainTable() {
               
               return (
                 <tr key={idx} className="ctr-tr">
-                  <td className="ctr-td">
+                  <td className="ctr-td name-col">
                     {editingCell?.row === idx && editingCell?.field === 'name' ? (
                       <input
                         className="ctr-input"
@@ -965,16 +905,22 @@ export default function MainTable() {
                         autoFocus
                       />
                     ) : (
-                      <div 
+                      <div
                         className="ctr-cell-content"
-                        onDoubleClick={() => handleCellDoubleClick(idx, 'name')}
-                        onTouchStart={() => handleCellDoubleTap(idx, 'name')}
+                        onDoubleClick={!isTouchDevice ? () => handleCellDoubleClick(idx, 'name') : undefined}
+                        onClick={isTouchDevice ? () => handleCellDoubleClick(idx, 'name') : undefined}
                       >
-                        {row.name || ''}
+                        {row.name
+                          ? row.name
+                              .split(/(?<=[a-z])(?=[A-Z])/)
+                              .map((part, i) => (
+                                <span key={i} style={{ display: 'block', wordBreak: 'break-word' }}>{part}</span>
+                              ))
+                          : ''}
                       </div>
                     )}
                   </td>
-                  <td className="ctr-td">
+                  <td className="ctr-td class-col">
                     {editingCell?.row === idx && editingCell?.field === 'classification' ? (
                       <input
                         className="ctr-input"
@@ -984,10 +930,10 @@ export default function MainTable() {
                         autoFocus
                       />
                     ) : (
-                      <div 
+                      <div
                         className="ctr-cell-content"
-                        onDoubleClick={() => handleCellDoubleClick(idx, 'classification')}
-                        onTouchStart={() => handleCellDoubleTap(idx, 'classification')}
+                        onDoubleClick={!isTouchDevice ? () => handleCellDoubleClick(idx, 'classification') : undefined}
+                        onClick={isTouchDevice ? () => handleCellDoubleClick(idx, 'classification') : undefined}
                       >
                         {row.classification}
                       </div>
@@ -995,7 +941,7 @@ export default function MainTable() {
                   </td>
                   {row.days.map((day, dayIdx) => (
                     <React.Fragment key={dayIdx}>
-                      <td className="ctr-td">
+                      <td className="ctr-td time-col">
                         {editingCell?.row === idx && editingCell?.field === 'on' && editingCell?.dayIdx === dayIdx ? (
                           <input
                             className="ctr-input ctr-on"
@@ -1009,16 +955,16 @@ export default function MainTable() {
                             pattern="[0-9]*"
                           />
                         ) : (
-                          <div 
+                          <div
                             className="ctr-cell-content"
-                            onDoubleClick={() => handleCellDoubleClick(idx, 'on', dayIdx)}
-                            onTouchStart={() => handleCellDoubleTap(idx, 'on', dayIdx)}
+                            onDoubleClick={!isTouchDevice ? () => handleCellDoubleClick(idx, 'on', dayIdx) : undefined}
+                            onClick={isTouchDevice ? () => handleCellDoubleClick(idx, 'on', dayIdx) : undefined}
                           >
                             {day.on}
                           </div>
                         )}
                       </td>
-                      <td className="ctr-td">
+                      <td className="ctr-td time-col">
                         {editingCell?.row === idx && editingCell?.field === 'off' && editingCell?.dayIdx === dayIdx ? (
                           <input
                             className="ctr-input ctr-off"
@@ -1032,10 +978,10 @@ export default function MainTable() {
                             pattern="[0-9]*"
                           />
                         ) : (
-                          <div 
+                          <div
                             className="ctr-cell-content"
-                            onDoubleClick={() => handleCellDoubleClick(idx, 'off', dayIdx)}
-                            onTouchStart={() => handleCellDoubleTap(idx, 'off', dayIdx)}
+                            onDoubleClick={!isTouchDevice ? () => handleCellDoubleClick(idx, 'off', dayIdx) : undefined}
+                            onClick={isTouchDevice ? () => handleCellDoubleClick(idx, 'off', dayIdx) : undefined}
                           >
                             {day.off}
                           </div>

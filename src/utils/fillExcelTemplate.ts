@@ -1,22 +1,5 @@
-import * as XLSX from 'xlsx';
-
-interface CrewMember {
-  remarkNumber?: string;
-  name: string;
-  classification: string;
-  days: {
-    date: string;
-    on: string;
-    off: string;
-  }[];
-}
-
-interface CrewInfo {
-  crewName: string;
-  crewNumber: string;
-  fireName: string;
-  fireNumber: string;
-}
+import ExcelJS from 'exceljs';
+import { CrewMember, CrewInfo } from '../types/CTRTypes';
 
 interface TemplateMapping {
   // Header Information
@@ -65,55 +48,146 @@ const CTR_TEMPLATE_MAPPING: TemplateMapping = {
   totalHoursCol: 'C'     // Total hours in column C
 };
 
+function setColumnWidths(worksheet: ExcelJS.Worksheet) {
+  // Log current column properties
+  console.log('Current column properties:', worksheet.columns.map(col => ({
+    key: col.key,
+    width: col.width,
+    isCustomWidth: col.isCustomWidth
+  })));
+
+  // Define column widths in character units (not MDW)
+  const columnWidths = [
+    { key: 'A', width: 4.75 },
+    { key: 'B', width: 15.73 },
+    { key: 'C', width: 5.24 },
+    { key: 'D', width: 4.95 },
+    { key: 'E', width: 4.93 },
+    { key: 'F', width: 4.93 },
+    { key: 'G', width: 4.93 },
+    { key: 'H', width: 4.93 },
+    { key: 'I', width: 5.932 },
+    { key: 'J', width: 25 },
+    { key: 'K', width: 4.45 },
+    { key: 'L', width: 5.4 },
+    { key: 'M', width: 5.5 },
+    { key: 'N', width: 5.45 },
+    { key: 'O', width: 5.6 },
+    { key: 'P', width: 5.7 }
+  ];
+
+  // Set each column width individually
+  columnWidths.forEach(({ key, width }) => {
+    const col = worksheet.getColumn(key);
+    
+    // Set width and ensure it's marked as custom width
+    worksheet.getColumn(key).width = width;
+    
+    // Force column to be custom width
+    if (col.eachCell) {
+      col.eachCell({ includeEmpty: true }, (cell) => {
+        const style = cell.style || {};
+        style.alignment = style.alignment || {};
+        style.alignment.wrapText = true;
+        cell.style = style;
+      });
+    }
+  });
+
+  // Log final column properties
+  console.log('Updated column properties:', worksheet.columns.map(col => ({
+    key: col.key,
+    width: col.width,
+    isCustomWidth: col.isCustomWidth
+  })));
+}
+
+function formatDateWithTwoDigitYear(dateStr: string): string {
+  if (!dateStr) return '';
+  
+  // If the date contains a year, extract and format it
+  const match = dateStr.match(/\d{4}/);
+  if (match) {
+    const fullYear = match[0];
+    const twoDigitYear = fullYear.slice(-2);
+    return dateStr.replace(fullYear, twoDigitYear);
+  }
+  
+  return dateStr;
+}
+
 export async function fillExcelTemplate(
-  data: any[],
-  crewInfo: any,
+  data: CrewMember[],
+  crewInfo: CrewInfo,
   days: string[],
   templateUrl = '/CTR_Template.xlsx',
   mapping: TemplateMapping = CTR_TEMPLATE_MAPPING
-): Promise<XLSX.WorkBook> {
+): Promise<ExcelJS.Workbook> {
   try {
     // Validate input data
     if (!Array.isArray(data)) {
       throw new Error('Data must be an array');
     }
 
-    // Fetch the template
+    // Create a new workbook and load the template
+    const workbook = new ExcelJS.Workbook();
     const response = await fetch(templateUrl);
     if (!response.ok) {
       throw new Error(`Failed to fetch template: ${response.statusText}`);
     }
     
     const templateData = await response.arrayBuffer();
-    const workbook = XLSX.read(templateData, { type: 'array' });
-    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+    await workbook.xlsx.load(templateData);
+    
+    // Get the first worksheet
+    let worksheet = workbook.getWorksheet(1);
+    if (!worksheet) {
+      worksheet = workbook.getWorksheet('Sheet1');
+    }
+    if (!worksheet) {
+      worksheet = workbook.worksheets[0];
+    }
+    if (!worksheet) {
+      throw new Error('Template worksheet not found');
+    }
 
-    // Fill header info
+    // Log initial worksheet state
+    console.log('Initial worksheet state:', {
+      name: worksheet.name,
+      columnCount: worksheet.columnCount,
+      rowCount: worksheet.rowCount,
+      columns: worksheet.columns.map(col => ({
+        key: col.key,
+        width: col.width,
+        isCustomWidth: col.isCustomWidth
+      }))
+    });
+
+    // Fill header info - only update values, preserve formatting
     if (mapping.crewName) {
-      worksheet[mapping.crewName] = { t: 's', v: crewInfo?.crewName || '' };
+      worksheet.getCell(mapping.crewName).value = crewInfo?.crewName || '';
     }
     if (mapping.crewNumber) {
-      worksheet[mapping.crewNumber] = { t: 's', v: crewInfo?.crewNumber || '' };
+      worksheet.getCell(mapping.crewNumber).value = crewInfo?.crewNumber || '';
     }
     if (mapping.fireName) {
-      worksheet[mapping.fireName] = { t: 's', v: crewInfo?.fireName || '' };
+      worksheet.getCell(mapping.fireName).value = crewInfo?.fireName || '';
     }
     if (mapping.fireNumber) {
-      worksheet[mapping.fireNumber] = { t: 's', v: crewInfo?.fireNumber || '' };
+      worksheet.getCell(mapping.fireNumber).value = crewInfo?.fireNumber || '';
     }
 
-    // Fill dates
+    // Fill dates - format with 2-digit year
     if (mapping.date1) {
-      worksheet[mapping.date1] = { t: 's', v: days?.[0] || '' };
+      worksheet.getCell(mapping.date1).value = formatDateWithTwoDigitYear(days?.[0] || '');
     }
     if (mapping.date2) {
-      worksheet[mapping.date2] = { t: 's', v: days?.[1] || '' };
+      worksheet.getCell(mapping.date2).value = formatDateWithTwoDigitYear(days?.[1] || '');
     }
 
-    // Fill crew member data
+    // Fill crew member data - only update values
     const startRow = mapping.nameStartRow || 6;
     data.forEach((row, idx) => {
-      // Skip if row is undefined or has no data
       if (!row || (!row.name && !row.classification)) return;
       
       const rowNum = startRow + idx;
@@ -121,29 +195,29 @@ export async function fillExcelTemplate(
 
       // Fill name and classification
       if (mapping.nameCol) {
-        worksheet[`${mapping.nameCol}${rowNum}`] = { t: 's', v: row.name || '' };
+        worksheet.getCell(`${mapping.nameCol}${rowNum}`).value = row.name || '';
       }
       if (mapping.classCol) {
-        worksheet[`${mapping.classCol}${rowNum}`] = { t: 's', v: row.classification || '' };
+        worksheet.getCell(`${mapping.classCol}${rowNum}`).value = row.classification || '';
       }
 
       // Fill times for day 1
       if (row.days?.[0]) {
         if (mapping.on1Col) {
-          worksheet[`${mapping.on1Col}${rowNum}`] = { t: 's', v: row.days[0].on || '' };
+          worksheet.getCell(`${mapping.on1Col}${rowNum}`).value = row.days[0].on || '';
         }
         if (mapping.off1Col) {
-          worksheet[`${mapping.off1Col}${rowNum}`] = { t: 's', v: row.days[0].off || '' };
+          worksheet.getCell(`${mapping.off1Col}${rowNum}`).value = row.days[0].off || '';
         }
       }
 
       // Fill times for day 2
       if (row.days?.[1]) {
         if (mapping.on2Col) {
-          worksheet[`${mapping.on2Col}${rowNum}`] = { t: 's', v: row.days[1].on || '' };
+          worksheet.getCell(`${mapping.on2Col}${rowNum}`).value = row.days[1].on || '';
         }
         if (mapping.off2Col) {
-          worksheet[`${mapping.off2Col}${rowNum}`] = { t: 's', v: row.days[1].off || '' };
+          worksheet.getCell(`${mapping.off2Col}${rowNum}`).value = row.days[1].off || '';
         }
       }
     });
@@ -151,59 +225,36 @@ export async function fillExcelTemplate(
     // Calculate and fill total hours
     const totalHours = calculateTotalHours(data);
     if (mapping.totalHoursRow && mapping.totalHoursCol) {
-      worksheet[`${mapping.totalHoursCol}${mapping.totalHoursRow}`] = { t: 'n', v: totalHours };
+      worksheet.getCell(`${mapping.totalHoursCol}${mapping.totalHoursRow}`).value = totalHours;
     }
+
+    // Only set protection without modifying any other properties
+    worksheet.protect('', {
+      selectLockedCells: true,
+      selectUnlockedCells: true,
+      formatCells: false,
+      formatColumns: false,
+      formatRows: false,
+      insertColumns: false,
+      insertRows: false,
+      insertHyperlinks: false,
+      deleteColumns: false,
+      deleteRows: false,
+      sort: false,
+      autoFilter: false,
+      pivotTables: false,
+      objects: true,
+      scenarios: true
+    });
+
+    // Apply column widths as the final step
+    setColumnWidths(worksheet);
 
     return workbook;
   } catch (error) {
-    console.error('Error filling Excel template:', error);
+    console.error('Error in fillExcelTemplate:', error);
     throw error;
   }
-}
-
-function findHeaderCells(worksheet: XLSX.WorkSheet): TemplateMapping {
-  const mapping: TemplateMapping = {};
-  const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
-
-  // Search for header patterns
-  for (let R = range.s.r; R <= range.e.r; R++) {
-    for (let C = range.s.c; C <= range.e.c; C++) {
-      const cell = worksheet[XLSX.utils.encode_cell({ r: R, c: C })];
-      if (!cell || !cell.v) continue;
-
-      const value = String(cell.v).toLowerCase();
-      const cellRef = XLSX.utils.encode_cell({ r: R, c: C });
-
-      // Look for header patterns
-      if (value.includes('crew') && value.includes('name')) {
-        mapping.crewName = cellRef;
-      } else if (value.includes('crew') && value.includes('number')) {
-        mapping.crewNumber = cellRef;
-      } else if (value.includes('fire') && value.includes('name')) {
-        mapping.fireName = cellRef;
-      } else if (value.includes('fire') && value.includes('number')) {
-        mapping.fireNumber = cellRef;
-      } else if (value.includes('date') && !mapping.date1) {
-        mapping.date1 = cellRef;
-      } else if (value.includes('date') && mapping.date1) {
-        mapping.date2 = cellRef;
-      } else if (value.includes('name') && !mapping.nameCol) {
-        mapping.nameCol = XLSX.utils.encode_col(C);
-        mapping.nameStartRow = R + 1;
-      } else if (value.includes('class') && !mapping.classCol) {
-        mapping.classCol = XLSX.utils.encode_col(C);
-      } else if (value.includes('on') && !mapping.on1Col) {
-        mapping.on1Col = XLSX.utils.encode_col(C);
-      } else if (value.includes('off') && !mapping.off1Col) {
-        mapping.off1Col = XLSX.utils.encode_col(C);
-      } else if (value.includes('total') && value.includes('hours')) {
-        mapping.totalHoursRow = R;
-        mapping.totalHoursCol = XLSX.utils.encode_col(C + 1); // Assuming total is in next column
-      }
-    }
-  }
-
-  return mapping;
 }
 
 function calculateTotalHours(data: CrewMember[]): number {

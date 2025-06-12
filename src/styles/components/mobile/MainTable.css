@@ -1,0 +1,320 @@
+/* Mobile MainTable styles */
+.ctr-container {
+  width: var(--mobile-container-width);
+  margin: 0;
+  padding: var(--mobile-padding);
+  background: #fff;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.ctr-title {
+  font-size: 24px;
+  color: var(--text-color);
+  margin-bottom: var(--mobile-spacing);
+  text-align: center;
+}
+
+.ctr-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: var(--mobile-spacing) 0;
+  font-size: var(--mobile-font-size);
+  display: block;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.ctr-th, .ctr-td {
+  padding: 8px 4px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.ctr-th {
+  background-color: #f5f5f5;
+  font-weight: bold;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.ctr-td {
+  vertical-align: top;
+}
+
+.ctr-td input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: var(--mobile-font-size);
+}
+
+.ctr-td input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.ctr-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: var(--mobile-spacing);
+}
+
+.ctr-btn {
+  padding: 12px;
+  font-size: var(--mobile-font-size);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background-color: var(--primary-color);
+  color: white;
+  width: 100%;
+}
+
+.ctr-btn:active {
+  background-color: #8b0000;
+}
+
+.ctr-btn:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+.ctr-date-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mobile-spacing);
+  margin-bottom: var(--mobile-spacing);
+}
+
+.ctr-date-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.ctr-select {
+  padding: 12px;
+  font-size: var(--mobile-font-size);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  width: 100%;
+}
+
+.calendar-btn {
+  padding: 12px;
+  font-size: 20px;
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+}
+
+.calendar-btn:active {
+  background-color: #f5f5f5;
+  border-color: var(--primary-color);
+}
+
+.ctr-signature-section {
+  margin-top: var(--mobile-spacing);
+  padding: var(--mobile-spacing);
+  background-color: #f5f5f5;
+  border-radius: 4px;
+}
+
+.ctr-signature-display {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mobile-spacing);
+}
+
+.ctr-signature-content {
+  width: 100%;
+}
+
+.ctr-signature-label {
+  color: #666;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.ctr-signature-name {
+  color: var(--text-color);
+  margin-bottom: 12px;
+}
+
+.ctr-signature-image {
+  width: 100%;
+  border: 1px solid var(--border-color);
+  background: white;
+  padding: 8px;
+  border-radius: 4px;
+}
+
+.ctr-signature-image img {
+  width: 100%;
+  height: auto;
+}
+
+.signature-btn, .edit-signature-btn {
+  background: var(--secondary-color);
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.signature-btn:active, .edit-signature-btn:active {
+  background: #1565c0;
+}
+
+.ctr-total-hours {
+  margin-top: var(--mobile-spacing);
+  padding: var(--mobile-spacing);
+  background-color: #f5f5f5;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.ctr-total-label {
+  color: #666;
+}
+
+.ctr-total-value {
+  color: var(--primary-color);
+  text-align: right;
+}
+
+.ctr-navigation-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.nav-btn {
+  background: var(--secondary-color);
+  width: 100%;
+}
+
+.nav-btn:not(:disabled):active {
+  background: #1565c0;
+}
+
+.nav-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9997;
+}
+
+.modal-content {
+  background-color: white;
+  padding: var(--mobile-spacing);
+  border-radius: 0;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.pdf-modal {
+  width: 100vw;
+  height: 100vh;
+  padding: 0;
+  background-color: #f5f5f5;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-close-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.modal-close-btn:active {
+  background: white;
+}
+
+.ctr-pdf-section {
+  margin-top: var(--mobile-spacing);
+  padding: var(--mobile-spacing);
+  background-color: #f5f5f5;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.ctr-pdf-section h3 {
+  margin: 0 0 8px 0;
+  color: var(--text-color);
+}
+
+.ctr-pdf-section p {
+  margin: 0 0 12px 0;
+  color: #666;
+}
+
+.ctr-pdf-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.view-pdf-btn, .sign-pdf-btn {
+  width: 100%;
+}
+
+.view-pdf-btn {
+  background-color: var(--secondary-color);
+}
+
+.sign-pdf-btn {
+  background-color: #388e3c;
+}
+
+.view-pdf-btn:active {
+  background-color: #1565c0;
+}
+
+.sign-pdf-btn:active {
+  background-color: #2e7d32;
+} 

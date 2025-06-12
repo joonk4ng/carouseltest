@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import '../styles/SignatureCanvas.css';
+import React, { useRef, useEffect, useState } from 'react';
+import '../styles/components/SignatureCanvas.css';
 
 interface Point {
   x: number;
@@ -9,42 +9,65 @@ interface Point {
 interface SignatureCanvasProps {
   onSave: (signatureData: string) => void;
   onCancel: () => void;
-  width?: number;
-  height?: number;
+  showGuideLine?: boolean;
   lineColor?: string;
   lineWidth?: number;
-  showGuideLine?: boolean;
 }
 
 export const SignatureCanvas: React.FC<SignatureCanvasProps> = ({
   onSave,
   onCancel,
-  width = 800,
-  height = 200,
-  lineColor = '#000000',
-  lineWidth = 2,
   showGuideLine = true,
+  lineColor = '#000000',
+  lineWidth = 2
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
-  const lastPoint = useRef<Point | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
+  const [lastPoint, setLastPoint] = useState<Point | null>(null);
+
+  // Prevent default touch behavior
+  useEffect(() => {
+    const preventDefault = (e: TouchEvent) => {
+      e.preventDefault();
+    };
+
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener('touchstart', preventDefault, { passive: false });
+      container.addEventListener('touchmove', preventDefault, { passive: false });
+      container.addEventListener('touchend', preventDefault, { passive: false });
+    }
+
+    return () => {
+      if (container) {
+        container.removeEventListener('touchstart', preventDefault);
+        container.removeEventListener('touchmove', preventDefault);
+        container.removeEventListener('touchend', preventDefault);
+      }
+    };
+  }, []);
 
   useEffect(() => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current || !containerRef.current) return;
 
     const canvas = canvasRef.current;
+    const container = containerRef.current;
     const context = canvas.getContext('2d');
 
     if (!context) return;
 
     // Set up high DPI canvas
     const dpr = window.devicePixelRatio || 1;
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
+    const rect = container.getBoundingClientRect();
+    
+    // Set canvas size based on container size
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
 
     // Scale context for high DPI display
     context.scale(dpr, dpr);
@@ -60,93 +83,69 @@ export const SignatureCanvas: React.FC<SignatureCanvasProps> = ({
     if (showGuideLine) {
       drawGuideLine(context);
     }
-  }, [width, height, lineColor, lineWidth, showGuideLine]);
+  }, [lineColor, lineWidth, showGuideLine]);
 
   const drawGuideLine = (context: CanvasRenderingContext2D) => {
-    const y = height * 0.7; // Position guide line at 70% of height
-    context.save();
-    context.strokeStyle = '#CCCCCC';
+    const { width, height } = context.canvas;
+    context.beginPath();
+    context.moveTo(width * 0.1, height * 0.7);
+    context.lineTo(width * 0.9, height * 0.7);
+    context.strokeStyle = '#ccc';
     context.lineWidth = 1;
-    context.setLineDash([5, 5]);
-    context.beginPath();
-    context.moveTo(0, y);
-    context.lineTo(width, y);
     context.stroke();
-    context.restore();
   };
 
-  const getEventPoint = (
-    event: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>,
-    canvas: HTMLCanvasElement
-  ): Point => {
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-
-    if ('touches' in event) {
-      const touch = event.touches[0];
-      return {
-        x: (touch.clientX - rect.left) * scaleX,
-        y: (touch.clientY - rect.top) * scaleY,
-      };
-    } else {
-      return {
-        x: (event.clientX - rect.left) * scaleX,
-        y: (event.clientY - rect.top) * scaleY,
-      };
-    }
+  const getTouchCoordinates = (e: TouchEvent): Point => {
+    const touch = e.touches[0];
+    const rect = canvasRef.current!.getBoundingClientRect();
+    const scaleX = canvasRef.current!.width / rect.width;
+    const scaleY = canvasRef.current!.height / rect.height;
+    
+    return {
+      x: (touch.clientX - rect.left) * scaleX,
+      y: (touch.clientY - rect.top) * scaleY
+    };
   };
 
-  const startDrawing = (event: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    if (!canvasRef.current) return;
-    
-    event.preventDefault();
-    setIsDrawing(true);
-    
-    const point = getEventPoint(event, canvasRef.current);
-    lastPoint.current = point;
-    
-    const context = contextRef.current;
-    if (context) {
-      context.beginPath();
-      context.moveTo(point.x, point.y);
-    }
-  };
-
-  const draw = (event: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || !canvasRef.current || !contextRef.current || !lastPoint.current) return;
-    
-    event.preventDefault();
-    const point = getEventPoint(event, canvasRef.current);
-    
-    // Smooth line drawing using quadratic curves
-    const context = contextRef.current;
-    context.beginPath();
-    context.moveTo(lastPoint.current.x, lastPoint.current.y);
-    
-    const midPoint = {
-      x: (lastPoint.current.x + point.x) / 2,
-      y: (lastPoint.current.y + point.y) / 2,
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    const point = 'touches' in e ? getTouchCoordinates(e as unknown as TouchEvent) : {
+      x: e.nativeEvent.offsetX,
+      y: e.nativeEvent.offsetY
     };
     
-    context.quadraticCurveTo(
-      lastPoint.current.x,
-      lastPoint.current.y,
-      midPoint.x,
-      midPoint.y
-    );
-    
-    context.stroke();
-    lastPoint.current = point;
-    setHasSignature(true);
+    if (contextRef.current) {
+      contextRef.current.beginPath();
+      contextRef.current.moveTo(point.x, point.y);
+      setIsDrawing(true);
+      setLastPoint(point);
+      setHasSignature(true);
+    }
+  };
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    if (!isDrawing || !contextRef.current || !lastPoint) return;
+
+    const point = 'touches' in e ? getTouchCoordinates(e as unknown as TouchEvent) : {
+      x: e.nativeEvent.offsetX,
+      y: e.nativeEvent.offsetY
+    };
+
+    // Draw smooth line
+    contextRef.current.beginPath();
+    contextRef.current.moveTo(lastPoint.x, lastPoint.y);
+    contextRef.current.lineTo(point.x, point.y);
+    contextRef.current.stroke();
+    setLastPoint(point);
   };
 
   const stopDrawing = () => {
     setIsDrawing(false);
-    lastPoint.current = null;
+    setLastPoint(null);
   };
 
-  const clear = () => {
+  const clearCanvas = () => {
     const canvas = canvasRef.current;
     const context = contextRef.current;
     
@@ -159,7 +158,7 @@ export const SignatureCanvas: React.FC<SignatureCanvasProps> = ({
     setHasSignature(false);
   };
 
-  const save = () => {
+  const saveSignature = () => {
     if (!canvasRef.current || !hasSignature) return;
     
     // Add metadata to the signature
@@ -170,50 +169,91 @@ export const SignatureCanvas: React.FC<SignatureCanvasProps> = ({
     if (context) {
       context.font = '10px Arial';
       context.fillStyle = '#999999';
-      context.fillText(`Signed: ${timestamp}`, 5, height - 5);
+      context.fillText(`Signed: ${timestamp}`, 5, canvas.height - 5);
     }
     
     const signatureData = canvas.toDataURL('image/png');
     onSave(signatureData);
   };
 
+  const handleActionSelect = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const action = event.target.value;
+    switch (action) {
+      case 'clear':
+        clearCanvas();
+        break;
+      case 'save':
+        saveSignature();
+        break;
+      case 'cancel':
+        onCancel();
+        break;
+    }
+    // Reset the select to default option
+    event.target.value = 'default';
+  };
+
   return (
-    <div className="signature-canvas-container">
-      <canvas
-        ref={canvasRef}
-        onMouseDown={startDrawing}
-        onMouseMove={draw}
-        onMouseUp={stopDrawing}
-        onMouseLeave={stopDrawing}
-        onTouchStart={startDrawing}
-        onTouchMove={draw}
-        onTouchEnd={stopDrawing}
-        className="signature-canvas"
-      />
-      <div className="signature-canvas-actions">
-        <button
-          onClick={clear}
-          className="signature-button clear-button"
-          type="button"
-        >
-          Clear
-        </button>
-        <button
-          onClick={save}
-          className="signature-button save-button"
-          type="button"
-          disabled={!hasSignature}
-        >
-          Save
-        </button>
-        <button
-          onClick={onCancel}
-          className="signature-button cancel-button"
-          type="button"
-        >
-          Cancel
-        </button>
+    <>
+      <div className="signature-overlay" onTouchMove={e => e.preventDefault()} />
+      <div className="signature-canvas-container" ref={containerRef}>
+        <div className="signature-canvas-wrapper">
+          <canvas
+            ref={canvasRef}
+            className="signature-canvas"
+            onMouseDown={startDrawing}
+            onMouseMove={draw}
+            onMouseUp={stopDrawing}
+            onMouseLeave={stopDrawing}
+            onTouchStart={startDrawing}
+            onTouchMove={draw}
+            onTouchEnd={stopDrawing}
+          />
+          {!hasSignature && (
+            <div className="signature-canvas-placeholder">
+              Sign here
+            </div>
+          )}
+          {showGuideLine && <div className="signature-guide-line" />}
+        </div>
+        <div className="signature-canvas-actions">
+          <select 
+            className="action-select"
+            onChange={handleActionSelect}
+            defaultValue="default"
+          >
+            <option value="default" disabled>Select an action...</option>
+            <option value="clear">Clear Drawing</option>
+            <option value="save" disabled={!hasSignature}>Save</option>
+            <option value="cancel">Cancel</option>
+          </select>
+          <div className="button-bar">
+            <button
+              onClick={clearCanvas}
+              className="signature-button clear-button"
+              type="button"
+              disabled={!hasSignature}
+            >
+              Clear
+            </button>
+            <button
+              onClick={saveSignature}
+              className="signature-button save-button"
+              type="button"
+              disabled={!hasSignature}
+            >
+              Save
+            </button>
+            <button
+              onClick={onCancel}
+              className="signature-button cancel-button"
+              type="button"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }; 

@@ -1,13 +1,13 @@
 import { CrewMember, CrewInfo } from '../types/CTRTypes';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 // Define the expected cell locations in the Excel template
 export const EXCEL_CELL_MAPPING = {
   crewInfo: {
-    crewName: 'B1',
-    crewNumber: 'H1',
+    crewName: 'A1',
+    crewNumber: 'F1',
     fireName: 'C2',
-    fireNumber: 'H2'
+    fireNumber: 'F2'
   },
   dates: {
     date1: 'F4',
@@ -26,31 +26,40 @@ export const EXCEL_CELL_MAPPING = {
   }
 };
 
-function getMergedCellValue(worksheet: XLSX.WorkSheet, cellAddress: string): any {
-  // Check if the cell has a value
-  if (worksheet[cellAddress] && worksheet[cellAddress].v !== undefined) {
-    return worksheet[cellAddress].v;
-  }
-  // Check for merges
-  const merges = worksheet['!merges'] || [];
-  const XLSXUtils = XLSX.utils.decode_cell;
-  const target = XLSXUtils(cellAddress);
+function getMergedCellValue(worksheet: ExcelJS.Worksheet, cellAddress: string): string {
+  const cell = worksheet.getCell(cellAddress);
+  
+  // Debug logging
+  console.log(`Reading cell ${cellAddress}:`, {
+    value: cell.value,
+    type: cell.type,
+    text: cell.text,
+    formula: cell.formula
+  });
 
-  for (const merge of merges) {
-    // Check if the cell is within this merge range
-    if (
-      target.r >= merge.s.r && target.r <= merge.e.r &&
-      target.c >= merge.s.c && target.c <= merge.e.c
-    ) {
-      // Get the top-left cell of the merge
-      const topLeft = XLSX.utils.encode_cell({ r: merge.s.r, c: merge.s.c });
-      return worksheet[topLeft]?.v ?? '';
-    }
+  // Handle different types of cell values
+  if (cell.value === null || cell.value === undefined) {
+    return '';
   }
-  return '';
+
+  // If the cell value is a rich text object
+  if (cell.type === ExcelJS.ValueType.RichText) {
+    const richTextValue = cell.value as ExcelJS.CellRichTextValue;
+    return richTextValue.richText.map(rt => rt.text).join('');
+  }
+
+  // For dates, return the formatted text
+  if (cell.type === ExcelJS.ValueType.Date) {
+    return cell.text || '';
+  }
+
+  // For all other types, convert to string
+  return cell.value?.toString() || '';
 }
 
-export function mapExcelToData(worksheet: XLSX.WorkSheet): { crewInfo: CrewInfo; crewMembers: CrewMember[] } {
+export function mapExcelToData(worksheet: ExcelJS.Worksheet): { crewInfo: CrewInfo; crewMembers: CrewMember[] } {
+  console.log('Starting Excel import...');
+  
   // Extract crew info from specific cells
   const crewInfo: CrewInfo = {
     crewName: getMergedCellValue(worksheet, EXCEL_CELL_MAPPING.crewInfo.crewName) || '',
@@ -59,9 +68,13 @@ export function mapExcelToData(worksheet: XLSX.WorkSheet): { crewInfo: CrewInfo;
     fireNumber: getMergedCellValue(worksheet, EXCEL_CELL_MAPPING.crewInfo.fireNumber) || ''
   };
 
+  console.log('Extracted crew info:', crewInfo);
+
   // Extract dates from specific cells
   const date1 = getMergedCellValue(worksheet, EXCEL_CELL_MAPPING.dates.date1) || '';
   const date2 = getMergedCellValue(worksheet, EXCEL_CELL_MAPPING.dates.date2) || '';
+
+  console.log('Extracted dates:', { date1, date2 });
 
   const crewMembers: CrewMember[] = [];
   let row = EXCEL_CELL_MAPPING.crewMembers.startRow;
@@ -69,14 +82,20 @@ export function mapExcelToData(worksheet: XLSX.WorkSheet): { crewInfo: CrewInfo;
   // Read up to 20 crew members (rows 6-25)
   while (row <= 25) {
     // Get the name cell for this row
-    const nameCell = worksheet[`${EXCEL_CELL_MAPPING.crewMembers.columns.name}${row}`];
+    const nameCell = worksheet.getCell(`${EXCEL_CELL_MAPPING.crewMembers.columns.name}${row}`);
+    const nameCellValue = getMergedCellValue(worksheet, `${EXCEL_CELL_MAPPING.crewMembers.columns.name}${row}`);
+    
+    console.log(`Reading row ${row}, name cell:`, nameCellValue);
     
     // If no name is found in the expected cell, stop reading
-    if (!nameCell?.v) break;
+    if (!nameCellValue) {
+      console.log(`No name found in row ${row}, stopping import`);
+      break;
+    }
 
     // Create crew member object with data from specific cells
     const crewMember: CrewMember = {
-      name: getMergedCellValue(worksheet, `${EXCEL_CELL_MAPPING.crewMembers.columns.name}${row}`),
+      name: nameCellValue,
       classification: getMergedCellValue(worksheet, `${EXCEL_CELL_MAPPING.crewMembers.columns.classification}${row}`),
       days: [
         {
@@ -92,28 +111,28 @@ export function mapExcelToData(worksheet: XLSX.WorkSheet): { crewInfo: CrewInfo;
       ]
     };
 
+    console.log(`Crew member data for row ${row}:`, crewMember);
     crewMembers.push(crewMember);
     row++;
   }
 
+  console.log('Total crew members imported:', crewMembers.length);
   return { crewInfo, crewMembers };
 }
 
-export function mapDataToExcel(data: { crewInfo: CrewInfo; crewMembers: CrewMember[] }): XLSX.WorkSheet {
-  const worksheet: XLSX.WorkSheet = {};
-
+export function mapDataToExcel(worksheet: ExcelJS.Worksheet, data: { crewInfo: CrewInfo; crewMembers: CrewMember[] }): void {
   // Set crew info in specific cells
-  worksheet[EXCEL_CELL_MAPPING.crewInfo.crewName] = { t: 's', v: data.crewInfo.crewName };
-  worksheet[EXCEL_CELL_MAPPING.crewInfo.crewNumber] = { t: 's', v: data.crewInfo.crewNumber };
-  worksheet[EXCEL_CELL_MAPPING.crewInfo.fireName] = { t: 's', v: data.crewInfo.fireName };
-  worksheet[EXCEL_CELL_MAPPING.crewInfo.fireNumber] = { t: 's', v: data.crewInfo.fireNumber };
+  worksheet.getCell(EXCEL_CELL_MAPPING.crewInfo.crewName).value = data.crewInfo.crewName;
+  worksheet.getCell(EXCEL_CELL_MAPPING.crewInfo.crewNumber).value = data.crewInfo.crewNumber;
+  worksheet.getCell(EXCEL_CELL_MAPPING.crewInfo.fireName).value = data.crewInfo.fireName;
+  worksheet.getCell(EXCEL_CELL_MAPPING.crewInfo.fireNumber).value = data.crewInfo.fireNumber;
 
   // Set dates in specific cells
   if (data.crewMembers[0]?.days[0]) {
-    worksheet[EXCEL_CELL_MAPPING.dates.date1] = { t: 's', v: data.crewMembers[0].days[0].date };
+    worksheet.getCell(EXCEL_CELL_MAPPING.dates.date1).value = data.crewMembers[0].days[0].date;
   }
   if (data.crewMembers[0]?.days[1]) {
-    worksheet[EXCEL_CELL_MAPPING.dates.date2] = { t: 's', v: data.crewMembers[0].days[1].date };
+    worksheet.getCell(EXCEL_CELL_MAPPING.dates.date2).value = data.crewMembers[0].days[1].date;
   }
 
   // Set crew member data in specific cells
@@ -121,21 +140,19 @@ export function mapDataToExcel(data: { crewInfo: CrewInfo; crewMembers: CrewMemb
     const row = EXCEL_CELL_MAPPING.crewMembers.startRow + index;
     
     // Set name and classification
-    worksheet[`${EXCEL_CELL_MAPPING.crewMembers.columns.name}${row}`] = { t: 's', v: member.name };
-    worksheet[`${EXCEL_CELL_MAPPING.crewMembers.columns.classification}${row}`] = { t: 's', v: member.classification };
+    worksheet.getCell(`${EXCEL_CELL_MAPPING.crewMembers.columns.name}${row}`).value = member.name;
+    worksheet.getCell(`${EXCEL_CELL_MAPPING.crewMembers.columns.classification}${row}`).value = member.classification;
     
     // Set first day's times
     if (member.days[0]) {
-      worksheet[`${EXCEL_CELL_MAPPING.crewMembers.columns.on1}${row}`] = { t: 's', v: member.days[0].on };
-      worksheet[`${EXCEL_CELL_MAPPING.crewMembers.columns.off1}${row}`] = { t: 's', v: member.days[0].off };
+      worksheet.getCell(`${EXCEL_CELL_MAPPING.crewMembers.columns.on1}${row}`).value = member.days[0].on;
+      worksheet.getCell(`${EXCEL_CELL_MAPPING.crewMembers.columns.off1}${row}`).value = member.days[0].off;
     }
     
     // Set second day's times
     if (member.days[1]) {
-      worksheet[`${EXCEL_CELL_MAPPING.crewMembers.columns.on2}${row}`] = { t: 's', v: member.days[1].on };
-      worksheet[`${EXCEL_CELL_MAPPING.crewMembers.columns.off2}${row}`] = { t: 's', v: member.days[1].off };
+      worksheet.getCell(`${EXCEL_CELL_MAPPING.crewMembers.columns.on2}${row}`).value = member.days[1].on;
+      worksheet.getCell(`${EXCEL_CELL_MAPPING.crewMembers.columns.off2}${row}`).value = member.days[1].off;
     }
   });
-
-  return worksheet;
 } 

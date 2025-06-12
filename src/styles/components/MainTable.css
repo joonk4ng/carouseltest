@@ -1,0 +1,7 @@
+/* Import mobile styles by default */
+@import './mobile/MainTable.css';
+
+/* Override with desktop styles for larger screens */
+@media (min-width: 768px) {
+  @import './desktop/MainTable.css';
+} 
