@@ -90,6 +90,7 @@ export const DateCalendar: React.FC<DateCalendarProps> = ({ savedDates, onDateSe
     return date.getMonth() === currentDate.getMonth();
   };
 
+  // Handles the rendering of the date calendar
   return (
     <div className="date-calendar-modal">
       <div className="date-calendar-content">

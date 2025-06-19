@@ -1,8 +1,10 @@
+// Handles the preview of the PDF with the signature
 import React, { useEffect, useState } from 'react';
 import { getPDF } from '../utils/pdfStorage';
 import '../styles/components/desktop/PDFPreviewViewer.css';
 import '../styles/components/mobile/PDFPreviewViewer.css';
 
+// Defines properties for the PDFPreviewViewer component
 interface PDFPreviewViewerProps {
   pdfId: string;
   onLoad?: () => void;
@@ -12,6 +14,7 @@ interface PDFPreviewViewerProps {
   onSaveWithSignature?: () => void;
 }
 
+// Defines the PDFPreviewViewer component
 const PDFPreviewViewer: React.FC<PDFPreviewViewerProps> = ({ 
   pdfId, 
   onLoad, 
@@ -75,6 +78,7 @@ const PDFPreviewViewer: React.FC<PDFPreviewViewerProps> = ({
     };
   }, [pdfId, onLoad]);
 
+  // Handles the downloading of the PDF
   const handleDownloadPDF = async () => {
     try {
       const pdfData = await getPDF(pdfId);
@@ -103,6 +107,7 @@ const PDFPreviewViewer: React.FC<PDFPreviewViewerProps> = ({
     }
   };
 
+  // Handles the printing of the PDF
   const handlePrint = async () => {
     try {
       const pdfData = await getPDF(pdfId);
@@ -151,6 +156,7 @@ const PDFPreviewViewer: React.FC<PDFPreviewViewerProps> = ({
     }
   };
 
+  // Handles the selection of the action
   const handleActionSelect = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const action = event.target.value;
     switch (action) {

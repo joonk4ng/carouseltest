@@ -12,11 +12,13 @@ import { calculateTotalHours } from '../utils/timeCalculations';
 import { DateCalendar } from './DateCalendar';
 import PDFGenerationViewer from './PDFGenerationViewer';
 import EnhancedPDFViewer from './EnhancedPDFViewer';
-import { storePDF } from '../utils/pdfStorage';
+import { storePDF, listPDFs } from '../utils/pdfStorage';
 import ExcelJS from 'exceljs';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import type { Workbook } from 'xlsx-populate';
 import XLSX from 'xlsx';
+import PrintableTable from './PrintableTable';
+import '../styles/components/PrintableTable.css';
 
 // TypeScript interfaces
 interface EditingCell {
@@ -29,6 +31,20 @@ interface NotificationState {
   message: string;
   type: 'info' | 'success' | 'warning' | 'error';
   show: boolean;
+}
+
+interface PDFData {
+  id: string;
+  pdf: Blob;
+  preview: Blob | null;
+  metadata: {
+    filename: string;
+    date: string;
+    crewNumber: string;
+    fireName: string;
+    fireNumber: string;
+  };
+  timestamp: string;
 }
 
 const STORAGE_KEY = 'ctr-table-data';
@@ -122,12 +138,81 @@ export default function MainTable() {
   // Add state for tracking if we're in signing mode
   const [isSigningMode, setIsSigningMode] = useState(false);
 
+  // Add state for collapsible section
+  const [isCollapsed, setIsCollapsed] = useState(true);
+  const [checkboxStates, setCheckboxStates] = useState({
+    noMealsLodging: false,
+    noMeals: false,
+    travel: false,
+    noLunch: false,
+    hotline: true  // Default to true
+  });
+  const [customEntries, setCustomEntries] = useState<string[]>([]);
+  const [newEntry, setNewEntry] = useState('');
+
+  const handleCheckboxChange = (option: keyof typeof checkboxStates) => {
+    setCheckboxStates(prev => {
+      const newStates = { ...prev };
+      
+      if (option === 'travel') {
+        // If turning on travel, automatically uncheck hotline
+        if (!prev.travel) {
+          newStates.hotline = false;
+        }
+        newStates.travel = !prev.travel;
+      } else if (option === 'hotline') {
+        newStates.hotline = !prev.hotline;
+      } else {
+        newStates[option] = !prev[option];
+      }
+      
+      return newStates;
+    });
+  };
+
+  const handleAddEntry = () => {
+    if (newEntry.trim() && !customEntries.includes(newEntry.trim())) {
+      setCustomEntries(prev => [...prev, newEntry.trim()]);
+      setNewEntry('');
+    }
+  };
+
+  const handleRemoveCustomEntry = (entryToRemove: string) => {
+    setCustomEntries(prev => prev.filter(entry => entry !== entryToRemove));
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleAddEntry();
+    }
+  };
+
   // Load saved dates on component mount
   useEffect(() => {
     const initializeApp = async () => {
       await loadSavedDates();
       // Load the first available date range if any exist
       const dateRanges = await ctrDataService.getAllDateRanges();
+      
+      // Load PDFs for all date ranges
+      const pdfs = await listPDFs();
+      const pdfMapping: Record<string, string> = {};
+      pdfs.forEach((pdf: PDFData) => {
+        const { date, crewNumber, fireName, fireNumber } = pdf.metadata;
+        // Find the date range that matches this PDF's metadata
+        const matchingDateRange = dateRanges.find(range => {
+          const [rangeDate] = range.split(' to ');
+          return rangeDate === date && 
+                 pdf.metadata.crewNumber === crewNumber &&
+                 pdf.metadata.fireName === fireName &&
+                 pdf.metadata.fireNumber === fireNumber;
+        });
+        if (matchingDateRange) {
+          pdfMapping[matchingDateRange] = pdf.id;
+        }
+      });
+      setPdfsByDateRange(pdfMapping);
+      
       if (dateRanges.length > 0) {
         const firstDateRange = dateRanges[0];
         await handleDateSelect(firstDateRange);
@@ -142,11 +227,15 @@ export default function MainTable() {
     if (data !== defaultData) {
       setLastSavedState({
         data: [...data],
-        crewInfo: { ...crewInfo },
+        crewInfo: { 
+          ...crewInfo,
+          checkboxStates: { ...checkboxStates },
+          customEntries: [...customEntries]
+        },
         days: [...days]
       });
     }
-  }, [data, crewInfo, days]);
+  }, [data, crewInfo, days, checkboxStates, customEntries]);
 
   // Update lastSavedTotalHours when data is loaded
   useEffect(() => {
@@ -180,15 +269,32 @@ export default function MainTable() {
       crewInfo.fireNumber !== lastSavedCrewInfo.fireNumber
     );
 
-    // Only set hasUnsavedChanges if we have required fields and either hours or crew info changed
+    // Check if checkbox states have changed
+    const checkboxStatesChanged = !deepEqual(
+      checkboxStates,
+      lastSavedState.crewInfo.checkboxStates || {
+        noMealsLodging: false,
+        noMeals: false,
+        travel: false,
+        noLunch: false
+      }
+    );
+
+    // Check if custom entries have changed
+    const customEntriesChanged = !deepEqual(
+      customEntries,
+      lastSavedState.crewInfo.customEntries || []
+    );
+
+    // Only set hasUnsavedChanges if we have required fields and any changes
     const hasChanges = Boolean(
-      (hoursChanged || crewInfoChanged) && 
+      (hoursChanged || crewInfoChanged || checkboxStatesChanged || customEntriesChanged) && 
       hasCrewInfo && 
       hasDates
     );
 
     setHasUnsavedChanges(hasChanges);
-  }, [totalHours, crewInfo, days, lastSavedTotalHours, lastSavedCrewInfo]);
+  }, [totalHours, crewInfo, days, lastSavedTotalHours, lastSavedCrewInfo, checkboxStates, customEntries, lastSavedState]);
 
   const loadSavedDates = async () => {
     try {
@@ -215,10 +321,13 @@ export default function MainTable() {
     try {
       const date1 = days[0];
       const date2 = days[1];
-      await ctrDataService.saveRecord(date1, date2, data, crewInfo);
+      await ctrDataService.saveRecord(date1, date2, data, {
+        ...crewInfo,
+        checkboxStates,
+        customEntries
+      });
       await loadSavedDates();
       
-      // Update lastSavedTotalHours and lastSavedCrewInfo after successful save
       setLastSavedTotalHours(totalHours);
       setLastSavedCrewInfo({ ...crewInfo });
       
@@ -236,21 +345,27 @@ export default function MainTable() {
   };
 
   const handlePreviousEntry = async () => {
+    if (hasUnsavedChanges) {
+      const confirm = window.confirm('You have unsaved changes. Do you want to continue without saving?');
+      if (!confirm) return;
+    }
+    
     const currentIndex = findCurrentDateIndex();
     if (currentIndex > 0) {
       const prevDateRange = savedDates[currentIndex - 1];
-      // Reset unsaved changes state before loading new data
-      setHasUnsavedChanges(false);
       await handleDateSelect(prevDateRange);
     }
   };
 
   const handleNextEntry = async () => {
+    if (hasUnsavedChanges) {
+      const confirm = window.confirm('You have unsaved changes. Do you want to continue without saving?');
+      if (!confirm) return;
+    }
+    
     const currentIndex = findCurrentDateIndex();
     if (currentIndex < savedDates.length - 1) {
       const nextDateRange = savedDates[currentIndex + 1];
-      // Reset unsaved changes state before loading new data
-      setHasUnsavedChanges(false);
       await handleDateSelect(nextDateRange);
     }
   };
@@ -275,6 +390,13 @@ export default function MainTable() {
         crewNumber: '',
         fireName: '',
         fireNumber: ''
+      });
+      setCheckboxStates({
+        noMealsLodging: false,
+        noMeals: false,
+        travel: false,
+        noLunch: false,
+        hotline: true
       });
       setPdfId(null);
       return;
@@ -314,32 +436,32 @@ export default function MainTable() {
     }
 
     try {
+      const [date1, date2] = dateRange.split(' to ');
       const record = await ctrDataService.getRecord(dateRange);
       if (record) {
-        const [date1, date2] = record.dateRange.split(' to ');
-        // Set dates first to prevent refresh issues
+        setData(record.data);
+        const { checkboxStates = {
+          noMealsLodging: false,
+          noMeals: false,
+          travel: false,
+          noLunch: false
+        }, customEntries = [], ...savedCrewInfo } = record.crewInfo;
+        setCrewInfo(savedCrewInfo);
+        setCheckboxStates(checkboxStates);
+        setCustomEntries(customEntries);
         setDays([date1, date2]);
         setSelectedDate(dateRange);
-        setCurrentDateIndex(savedDates.indexOf(dateRange));
-        
-        // Then set the data and crew info
-        setData(record.data);
-        setCrewInfo(record.crewInfo);
+        // Update currentDateIndex based on the selected date range
+        const newIndex = savedDates.findIndex(date => date === dateRange);
+        setCurrentDateIndex(newIndex);
         setHasUnsavedChanges(false);
         
-        // Update saved state tracking
-        const loadedTotalHours = calculateTotalHours(record.data);
-        setLastSavedTotalHours(loadedTotalHours);
-        setLastSavedCrewInfo({ ...record.crewInfo });
-        
-        // Set the PDF ID for this date range if it exists
+        // Set the PDF ID from the mapping, or null if no PDF exists for this date range
         setPdfId(pdfsByDateRange[dateRange] || null);
-        
-        showNotification('Data loaded successfully', 'success');
       }
     } catch (error) {
-      console.error('Error loading selected date range:', error);
-      showNotification('Failed to load data. Please try again.', 'error');
+      console.error('Error loading record:', error);
+      showNotification('Failed to load record', 'error');
     }
   };
 
@@ -557,7 +679,11 @@ export default function MainTable() {
   const handleExportPDF = async () => {
     try {
       // Generate PDF without immediate download
-      const result = await fillCTRPDF(data, crewInfo, { 
+      const result = await fillCTRPDF(data, {
+        ...crewInfo,
+        checkboxStates,
+        customEntries
+      }, { 
         downloadImmediately: false,
         returnBlob: false
       });
@@ -831,6 +957,15 @@ export default function MainTable() {
         <input type="file" accept=".xlsx" onChange={handleExcelUpload} />
         <button className="ctr-btn" onClick={handleExportExcel}>Export Excel</button>
         <button className="ctr-btn" onClick={handleExportPDF}>Save to PDF</button>
+        <PrintableTable 
+          data={data} 
+          crewInfo={{
+            ...crewInfo,
+            checkboxStates,
+            customEntries
+          }} 
+          days={days} 
+        />
         {pdfId && (
           <button 
             className="ctr-btn sign-btn" 
@@ -1011,6 +1146,110 @@ export default function MainTable() {
       <div className="ctr-total-hours">
         <div className="ctr-total-label">Total Hours Worked:</div>
         <div className="ctr-total-value">{totalHours.toFixed(2)}</div>
+      </div>
+
+      {/* Collapsible Section for Additional Options*/}
+      <div className="collapsible-section">
+        <button 
+          className="collapse-toggle"
+          onClick={() => setIsCollapsed(!isCollapsed)}
+        >
+          {isCollapsed ? '▼' : '▲'} Additional Options
+        </button>
+        <div className={`collapse-content ${isCollapsed ? 'collapsed' : ''}`}>
+          <div className="checkbox-options">
+            {/* HOTLINE - interactive now */}
+            <div className="checkbox-option">
+              <input
+                type="checkbox"
+                checked={checkboxStates.hotline}
+                onChange={() => handleCheckboxChange('hotline')}
+                id="hotline-checkbox"
+              />
+              <label htmlFor="hotline-checkbox">HOTLINE</label>
+            </div>
+
+            {/* Regular interactive options */}
+            <div className="checkbox-option">
+              <input
+                type="checkbox"
+                checked={checkboxStates.noMealsLodging}
+                onChange={() => handleCheckboxChange('noMealsLodging')}
+                id="no-meals-lodging-checkbox"
+              />
+              <label htmlFor="no-meals-lodging-checkbox">Self Sufficient - No Meals Provided</label>
+            </div>
+
+            <div className="checkbox-option">
+              <input
+                type="checkbox"
+                checked={checkboxStates.noMeals}
+                onChange={() => handleCheckboxChange('noMeals')}
+                id="no-meals-checkbox"
+              />
+              <label htmlFor="no-meals-checkbox">No Meals</label>
+            </div>
+
+            <div className="checkbox-option">
+              <input
+                type="checkbox"
+                checked={checkboxStates.travel}
+                onChange={() => handleCheckboxChange('travel')}
+                id="travel-checkbox"
+              />
+              <label htmlFor="travel-checkbox">Travel</label>
+            </div>
+
+            <div className="checkbox-option">
+              <input
+                type="checkbox"
+                checked={checkboxStates.noLunch}
+                onChange={() => handleCheckboxChange('noLunch')}
+                id="no-lunch-checkbox"
+              />
+              <label htmlFor="no-lunch-checkbox">No Lunch Taken due to Uncontrolled Fire</label>
+            </div>
+
+            {/* Custom entries */}
+            {customEntries.map((entry, index) => (
+              <div key={index} className="checkbox-option">
+                <input
+                  type="checkbox"
+                  checked={true}
+                  readOnly
+                  id={`custom-entry-${index}`}
+                />
+                <label htmlFor={`custom-entry-${index}`}>{entry}</label>
+                <button 
+                  className="remove-entry"
+                  onClick={() => handleRemoveCustomEntry(entry)}
+                  aria-label="Remove entry"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+
+            {/* Add new entry section */}
+            <div className="add-entry-section">
+              <input
+                type="text"
+                value={newEntry}
+                onChange={(e) => setNewEntry(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Add new option..."
+                className="add-entry-input"
+              />
+              <button 
+                className="add-entry-button"
+                onClick={handleAddEntry}
+                disabled={!newEntry.trim()}
+              >
+                Add
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {showCalendar && (

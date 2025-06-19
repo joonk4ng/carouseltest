@@ -15,4 +15,12 @@ export interface CrewInfo {
   crewNumber: string;
   fireName: string;
   fireNumber: string;
+  checkboxStates?: {
+    noMealsLodging: boolean;
+    noMeals: boolean;
+    travel: boolean;
+    noLunch: boolean;
+    hotline: boolean;
+  };
+  customEntries?: string[];
 } 

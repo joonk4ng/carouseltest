@@ -1,17 +1,13 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
+import { CrewMember, CrewInfo } from '../types/CTRTypes';
 
 interface CTRData extends DBSchema {
   ctr_records: {
     key: string; // date range as key (YYYY-MM-DD to YYYY-MM-DD)
     value: {
       dateRange: string;
-      data: any[];
-      crewInfo: {
-        crewName: string;
-        crewNumber: string;
-        fireName: string;
-        fireNumber: string;
-      };
+      data: CrewMember[];
+      crewInfo: CrewInfo;
     };
   };
 }
@@ -38,7 +34,7 @@ class CTRDataService {
     return `${date1} to ${date2}`;
   }
 
-  async saveRecord(date1: string, date2: string, data: any[], crewInfo: any) {
+  async saveRecord(date1: string, date2: string, data: CrewMember[], crewInfo: CrewInfo) {
     const db = await this.initDB();
     const dateRange = this.formatDateRange(date1, date2);
     console.log('Saving date range:', dateRange);
