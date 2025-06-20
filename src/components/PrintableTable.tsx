@@ -24,7 +24,10 @@ const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days })
   const handlePrint = () => {
     // Create a temporary div for printing
     const printContainer = document.createElement('div');
-    printContainer.style.display = 'none';
+    printContainer.style.position = 'fixed';
+    printContainer.style.top = '0';
+    printContainer.style.left = '0';
+    printContainer.style.width = '100%';
     printContainer.className = 'print-container';
     document.body.appendChild(printContainer);
 
@@ -32,23 +35,25 @@ const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days })
     const styleElement = document.createElement('style');
     styleElement.textContent = `
       @media print {
-        body * {
+        html, body {
+          margin: 0 !important;
+          padding: 0 !important;
+          height: auto !important;
+        }
+        body > *:not(.print-container) {
           display: none !important;
         }
-        body .print-container {
+        .print-container {
           display: block !important;
-          position: fixed !important;
-          left: 0 !important;
-          top: 0 !important;
-          width: 100% !important;
+          position: static !important;
+          margin: 0 !important;
+          padding: 0 !important;
         }
         .print-container * {
-          display: revert !important;
           visibility: visible !important;
         }
         @page {
-          margin-top: 0.45cm;
-          margin-left: 0.35cm;
+          margin: 0.45cm 0.35cm;
           size: auto;
         }
       }
@@ -361,23 +366,20 @@ const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days })
       // Add the content to the print container
       printContainer.innerHTML = tempDiv.innerHTML;
 
-      // Store the original styles
-      const originalStyles = {
-        overflow: document.body.style.overflow,
-      };
-
-      // Hide scrollbars during printing
-      document.body.style.overflow = 'hidden';
-
       // Print the document
-      window.print();
-
-      // Restore original styles
-      document.body.style.overflow = originalStyles.overflow;
-
-      // Clean up
-      document.head.removeChild(styleElement);
-      document.body.removeChild(printContainer);
+      setTimeout(() => {
+        window.print();
+        
+        // Clean up after a short delay to ensure print completes
+        setTimeout(() => {
+          if (document.head.contains(styleElement)) {
+            document.head.removeChild(styleElement);
+          }
+          if (document.body.contains(printContainer)) {
+            document.body.removeChild(printContainer);
+          }
+        }, 1000);
+      }, 100);
     } catch (error) {
       console.error('Error updating template:', error);
       // Clean up on error

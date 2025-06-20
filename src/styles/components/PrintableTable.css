@@ -18,38 +18,68 @@
   background-color: #2a5f9e;
 }
 
+.print-container {
+  display: none;
+}
+
+@media screen {
+  .print-container {
+    display: none !important;
+  }
+}
+
 @media print {
+  /* Reset body styles */
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Hide all other elements */
+  body > *:not(.print-container) {
+    display: none !important;
+  }
+
+  /* Show print container */
+  .print-container {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Ensure all content in print container is visible */
+  .print-container * {
+    visibility: visible !important;
+    display: block !important;
+  }
+
+  /* Table specific print styles */
+  .print-container table {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-collapse: collapse !important;
+  }
+
+  .print-container td,
+  .print-container th {
+    padding: 1mm !important;
+    border: none !important;
+  }
+
+  /* Hide print button */
   .print-btn {
     display: none !important;
   }
 
-  /* Hide all other components during printing */
-  .ctr-container,
-  .ctr-table,
-  .ctr-actions,
-  .ctr-date-controls,
-  .modal {
-    display: none !important;
-  }
-
-  /* Ensure print container is visible */
-  .print-container {
-    display: block !important;
-    visibility: visible !important;
-    position: fixed !important;
-    left: 0 !important;
-    top: 0 !important;
-    width: 100% !important;
-  }
-
-  /* Reset any mobile-specific styles that might interfere with printing */
+  /* Page settings */
   @page {
-    size: auto;
     margin: 0.45cm 0.35cm;
-  }
-
-  body {
-    margin: 0;
-    padding: 0;
+    size: auto;
   }
 } 
