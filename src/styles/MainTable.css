@@ -1,41 +1,68 @@
+/* Root variables */
+:root {
+  --table-width: 800px;
+}
+
 .ctr-container {
   padding: 1rem;
-  max-width: 100%;
+  max-width: var(--table-width, 100%);
   margin: 0 auto;
 }
 
+/* Optimize title for LCP */
 .ctr-title {
   color: #d32f2f;
   margin-bottom: 20px;
   text-align: center;
+  font-size: 1.5rem;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  font-weight: 600;
+  line-height: 1.2;
+  will-change: auto;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .ctr-crew-info-form {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 8px;
   margin-bottom: 20px;
-  max-width: 300px;
+  width: 100%;
+  max-width: var(--table-width, 100%);
+  margin-left: auto;
   margin-right: auto;
-  margin-left: 0;
 }
 
 .ctr-input {
-  padding: 4px 8px;
+  padding: 8px;
   border: 1px solid #ccc;
   border-radius: 4px;
   font-size: 14px;
   width: 100%;
+  height: 36px;
 }
 
+/* Action buttons container */
 .ctr-actions {
-  display: flex;
-  gap: 10px;
-  margin: 20px 0;
-  flex-wrap: wrap;
-  align-items: center;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  width: 100%;
+  max-width: var(--table-width, 100%);
+  margin: 0 auto 20px;
 }
 
+.ctr-actions input[type="file"] {
+  grid-column: 1 / -1;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+/* Style all action buttons consistently */
 .ctr-btn {
   padding: 8px 16px;
   border: none;
@@ -45,23 +72,44 @@
   cursor: pointer;
   font-size: 14px;
   transition: background-color 0.2s;
+  width: 100%;
+  text-align: center;
+  height: 36px;
 }
 
-.ctr-btn:hover:not(:disabled) {
-  opacity: 0.9;
+.ctr-btn.print-btn,
+.ctr-btn.export-btn,
+.ctr-btn.pdf-btn,
+.ctr-btn.reset-btn,
+.ctr-btn.remove-btn {
+  width: 100%;
+  margin: 0;
 }
 
-.ctr-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.ctr-btn.reset-btn {
+  background-color: #6c757d;
 }
 
-.ctr-btn.view-btn {
-  background-color: #2196f3;
+.ctr-btn.remove-btn {
+  background-color: #dc3545;
 }
 
-.ctr-btn.sign-btn {
-  background-color: #4caf50;
+.ctr-btn.print-btn {
+  background-color: #28a745;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .ctr-crew-info-form,
+  .ctr-actions {
+    grid-template-columns: 1fr;
+    padding: 0;
+  }
+
+  .ctr-btn {
+    font-size: 0.9rem;
+    padding: 0.5rem;
+  }
 }
 
 .ctr-table {
@@ -449,19 +497,22 @@
 .ctr-date-controls {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 1rem;
   margin-bottom: 1rem;
   flex-wrap: wrap;
+  width: 100%;
+  max-width: var(--table-width, 100%);
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .ctr-date-selector {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 1rem;
-  width: 100%;
-  max-width: 300px;
+  margin-bottom: 0;
+  flex: 1;
+  min-width: 200px;
 }
 
 .ctr-select {
@@ -474,7 +525,6 @@
   cursor: pointer;
   transition: all 0.2s;
   height: 40px;
-  min-width: 200px;
 }
 
 .ctr-select:focus {
@@ -503,6 +553,28 @@
   border-color: #d32f2f;
 }
 
+.ctr-navigation-buttons {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-btn {
+  background: #1976d2;
+  min-width: 100px;
+  white-space: nowrap;
+}
+
+.nav-btn:not(:disabled):hover {
+  background: #1565c0;
+}
+
+.nav-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
 .save-btn, .copy-btn {
   min-width: 120px;
   white-space: nowrap;
@@ -525,6 +597,52 @@
   background: #1565c0;
 }
 
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .ctr-date-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+    padding: 0;
+  }
+
+  .ctr-date-selector {
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+
+  .ctr-select {
+    font-size: 0.9rem;
+  }
+
+  .calendar-btn {
+    height: 36px;
+    width: 36px;
+    padding: 0.4rem;
+  }
+
+  .ctr-navigation-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    width: 100%;
+  }
+
+  .nav-btn {
+    width: 100%;
+    min-width: 0;
+    font-size: 0.9rem;
+    padding: 0.5rem;
+  }
+
+  .save-btn, .copy-btn {
+    width: 100%;
+    min-width: 0;
+    font-size: 0.9rem;
+    padding: 0.5rem;
+  }
+}
+
 .ctr-total-hours {
   margin-top: 20px;
   padding: 15px;
@@ -536,6 +654,9 @@
   gap: 10px;
   font-size: 16px;
   font-weight: bold;
+  max-width: var(--table-width, 100%);
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .ctr-total-label {
@@ -546,39 +667,6 @@
   color: #d32f2f;
   min-width: 80px;
   text-align: right;
-}
-
-.ctr-navigation-buttons {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-.nav-btn {
-  background: #1976d2;
-  min-width: 100px;
-}
-
-.nav-btn:not(:disabled):hover {
-  background: #1565c0;
-}
-
-.nav-btn:disabled {
-  background: #ccc;
-  cursor: not-allowed;
-}
-
-/* Mobile adjustments */
-@media (max-width: 768px) {
-  .ctr-navigation-buttons {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .nav-btn {
-    flex: 1;
-    max-width: 120px;
-  }
 }
 
 .ctr-date {

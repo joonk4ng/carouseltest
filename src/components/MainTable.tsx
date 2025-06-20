@@ -47,6 +47,22 @@ interface PDFData {
   timestamp: string;
 }
 
+interface CheckboxStates {
+  noMealsLodging: boolean;
+  noMeals: boolean;
+  travel: boolean;
+  noLunch: boolean;
+  hotline: boolean;
+}
+
+const defaultCheckboxStates: CheckboxStates = {
+  noMealsLodging: false,
+  noMeals: false,
+  travel: false,
+  noLunch: false,
+  hotline: true
+};
+
 const STORAGE_KEY = 'ctr-table-data';
 
 function saveData(data: CrewMember[]) {
@@ -80,7 +96,7 @@ function deepEqual(obj1: any, obj2: any): boolean {
 
 const isTouchDevice = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
-export default function MainTable() {
+const MainTable: React.FC = () => {
   const [data, setData] = useState<CrewMember[]>(defaultData);
   
   const [dayCount, setDayCount] = useState(2);
@@ -140,13 +156,7 @@ export default function MainTable() {
 
   // Add state for collapsible section
   const [isCollapsed, setIsCollapsed] = useState(true);
-  const [checkboxStates, setCheckboxStates] = useState({
-    noMealsLodging: false,
-    noMeals: false,
-    travel: false,
-    noLunch: false,
-    hotline: true  // Default to true
-  });
+  const [checkboxStates, setCheckboxStates] = useState<CheckboxStates>(defaultCheckboxStates);
   const [customEntries, setCustomEntries] = useState<string[]>([]);
   const [newEntry, setNewEntry] = useState('');
 
@@ -391,13 +401,8 @@ export default function MainTable() {
         fireName: '',
         fireNumber: ''
       });
-      setCheckboxStates({
-        noMealsLodging: false,
-        noMeals: false,
-        travel: false,
-        noLunch: false,
-        hotline: true
-      });
+      setCheckboxStates(defaultCheckboxStates);
+      setCustomEntries([]);
       setPdfId(null);
       return;
     }
@@ -425,6 +430,8 @@ export default function MainTable() {
         fireName: '',
         fireNumber: ''
       });
+      setCheckboxStates(defaultCheckboxStates);
+      setCustomEntries([]);
       setPdfId(null);
       showNotification('New entry started', 'info');
       return;
@@ -440,14 +447,12 @@ export default function MainTable() {
       const record = await ctrDataService.getRecord(dateRange);
       if (record) {
         setData(record.data);
-        const { checkboxStates = {
-          noMealsLodging: false,
-          noMeals: false,
-          travel: false,
-          noLunch: false
-        }, customEntries = [], ...savedCrewInfo } = record.crewInfo;
+        const { checkboxStates: savedCheckboxStates = defaultCheckboxStates, customEntries = [], ...savedCrewInfo } = record.crewInfo;
         setCrewInfo(savedCrewInfo);
-        setCheckboxStates(checkboxStates);
+        setCheckboxStates({
+          ...defaultCheckboxStates,
+          ...savedCheckboxStates
+        });
         setCustomEntries(customEntries);
         setDays([date1, date2]);
         setSelectedDate(dateRange);
@@ -466,6 +471,10 @@ export default function MainTable() {
   };
 
   const handleCellDoubleClick = (rowIdx: number, field: string, dayIdx?: number) => {
+    // Prevent re-entering edit mode if already editing
+    if (editingCell?.row === rowIdx && editingCell?.field === field && editingCell?.dayIdx === dayIdx) {
+      return;
+    }
     setEditingCell({ row: rowIdx, field, dayIdx });
   };
 
@@ -588,10 +597,17 @@ export default function MainTable() {
     setHasUnsavedChanges(true);
   };
 
-  const handleCellBlur = () => {
-    setTimeout(() => {
+  const handleCellBlur = (e: React.FocusEvent) => {
+    // On mobile, only blur if the related target is not another input
+    // This prevents the cell from exiting edit mode when the keyboard appears
+    if (isTouchDevice && e.relatedTarget instanceof HTMLInputElement) {
+      return;
+    }
+    
+    // Use requestAnimationFrame to ensure this runs after any click handlers
+    requestAnimationFrame(() => {
       setEditingCell(null);
-    }, 200);
+    });
   };
 
   const handleDelete = (idx: number) => {
@@ -867,7 +883,9 @@ export default function MainTable() {
           onClose={hideNotification}
         />
       )}
-      <h2 className="ctr-title">Crew Time Report Table</h2>
+      <h1 className="ctr-title" aria-label="Crew Time Report Table">
+        Crew Time Report Table
+      </h1>
       
       {/* Date Selection and Save Controls */}
       <div className="ctr-date-controls">
@@ -906,7 +924,7 @@ export default function MainTable() {
           <button 
             className="ctr-btn nav-btn" 
             onClick={handleNextEntry}
-            disabled={currentDateIndex >= savedDates.length - 1}
+            disabled={savedDates.length === 0 || currentDateIndex >= savedDates.length - 1}
           >
             Next →
           </button>
@@ -1043,7 +1061,11 @@ export default function MainTable() {
                       <div
                         className="ctr-cell-content"
                         onDoubleClick={!isTouchDevice ? () => handleCellDoubleClick(idx, 'name') : undefined}
-                        onClick={isTouchDevice ? () => handleCellDoubleClick(idx, 'name') : undefined}
+                        onClick={isTouchDevice ? (e) => {
+                          e.preventDefault(); // Prevent any default touch behavior
+                          e.stopPropagation(); // Stop event bubbling
+                          handleCellDoubleClick(idx, 'name');
+                        } : undefined}
                       >
                         {row.name
                           ? row.name
@@ -1068,7 +1090,11 @@ export default function MainTable() {
                       <div
                         className="ctr-cell-content"
                         onDoubleClick={!isTouchDevice ? () => handleCellDoubleClick(idx, 'classification') : undefined}
-                        onClick={isTouchDevice ? () => handleCellDoubleClick(idx, 'classification') : undefined}
+                        onClick={isTouchDevice ? (e) => {
+                          e.preventDefault(); // Prevent any default touch behavior
+                          e.stopPropagation(); // Stop event bubbling
+                          handleCellDoubleClick(idx, 'classification');
+                        } : undefined}
                       >
                         {row.classification}
                       </div>
@@ -1093,7 +1119,11 @@ export default function MainTable() {
                           <div
                             className="ctr-cell-content"
                             onDoubleClick={!isTouchDevice ? () => handleCellDoubleClick(idx, 'on', dayIdx) : undefined}
-                            onClick={isTouchDevice ? () => handleCellDoubleClick(idx, 'on', dayIdx) : undefined}
+                            onClick={isTouchDevice ? (e) => {
+                              e.preventDefault(); // Prevent any default touch behavior
+                              e.stopPropagation(); // Stop event bubbling
+                              handleCellDoubleClick(idx, 'on', dayIdx);
+                            } : undefined}
                           >
                             {day.on}
                           </div>
@@ -1116,7 +1146,11 @@ export default function MainTable() {
                           <div
                             className="ctr-cell-content"
                             onDoubleClick={!isTouchDevice ? () => handleCellDoubleClick(idx, 'off', dayIdx) : undefined}
-                            onClick={isTouchDevice ? () => handleCellDoubleClick(idx, 'off', dayIdx) : undefined}
+                            onClick={isTouchDevice ? (e) => {
+                              e.preventDefault(); // Prevent any default touch behavior
+                              e.stopPropagation(); // Stop event bubbling
+                              handleCellDoubleClick(idx, 'off', dayIdx);
+                            } : undefined}
                           >
                             {day.off}
                           </div>
@@ -1341,7 +1375,9 @@ export default function MainTable() {
       )}
     </div>
   );
-}
+};
+
+export default MainTable;
 
 // Add these styles to MainTable.css
 const styles = `
