@@ -22,118 +22,18 @@ const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days })
   const printRef = useRef<HTMLDivElement>(null);
 
   const handlePrint = () => {
-    // Create a temporary div for printing
-    const printContainer = document.createElement('div');
-    printContainer.style.position = 'fixed';
-    printContainer.style.top = '0';
-    printContainer.style.left = '0';
-    printContainer.style.width = '100%';
-    printContainer.className = 'print-container';
-    document.body.appendChild(printContainer);
+    // Create a new window
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Please allow popups to print the table');
+      return;
+    }
 
-    // Create a style element for print media
-    const styleElement = document.createElement('style');
-    styleElement.textContent = `
-      @media print {
-        html, body {
-          margin: 0 !important;
-          padding: 0 !important;
-          height: auto !important;
-        }
-        body > *:not(.print-container) {
-          display: none !important;
-        }
-        .print-container {
-          display: block !important;
-          position: static !important;
-          margin: 0 !important;
-          padding: 0 !important;
-        }
-        .print-container * {
-          visibility: visible !important;
-        }
-        @page {
-          margin: 0.45cm 0.35cm;
-          size: auto;
-        }
-      }
-    `;
-    document.head.appendChild(styleElement);
+    // Create a temporary div to parse the HTML
+    const tempDiv = document.createElement('div');
 
-    // HTML template
-    const template = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <style>
-        @page {
-            margin-top: 0.45cm;
-            margin-left: 0.35cm;
-        }
-
-        body {
-            font-family: Arial, sans-serif;
-            font-size: 6pt;
-            margin: 0;
-            padding: 0;
-        }
-
-        table {
-            border-collapse: collapse;
-            margin: 0;
-            padding: 0;
-            table-layout: fixed;
-        }
-
-        th, td {
-            border: none;
-            text-align: center;
-            vertical-align: middle;
-            overflow: hidden;
-            white-space: nowrap;
-            text-overflow: ellipsis;
-            line-height: 1;
-            height: 0.435cm;
-        }
-
-        thead th {
-            visibility: hidden;
-        }
-
-        td:nth-child(4), td:nth-child(5), td:nth-child(6), td:nth-child(7) {
-            text-align: center;
-        }
-
-        td:nth-child(2) {
-            text-align: center;
-        }
-
-        td:nth-child(3) {
-            text-align: center;
-        }
-
-        td:nth-child(1) {
-            text-align: center;
-        }
-
-        @media print {
-            html, body {
-                margin: 0;
-                padding: 0;
-            }
-            table, tr, td, th {
-                page-break-inside: avoid;
-                break-inside: avoid;
-            }
-        }
-
-        .header-table td {
-            height: 0.68cm;
-            padding: 0;
-            vertical-align: middle;
-        }
-    </style>
-</head>
-<body>
+    // Add the table template to the temporary div
+    tempDiv.innerHTML = `
     <!-- Crew Info Table -->
     <table class="header-table">
         <colgroup>
@@ -234,16 +134,120 @@ const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days })
             <tr><td style="text-align: left; padding-left: 0.5cm; height: 0.435cm;">placeholder.</td></tr>
             <tr><td style="text-align: left; padding-left: 0.5cm; height: 0.435cm;">placeholder.</td></tr>
         </tbody>
-    </table>
+    </table>`;
+
+    try {
+      // First create the wrapper HTML with styles
+      const wrapperHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crew Time Report</title>
+    <style>
+        @page {
+            margin-top: 0.45cm;
+            margin-left: 0.35cm;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 6pt;
+            margin: 0;
+            padding: 0;
+        }
+
+        table {
+            border-collapse: collapse;
+            margin: 0;
+            padding: 0;
+            table-layout: fixed;
+            width: 100%;
+        }
+
+        th, td {
+            border: none;
+            text-align: center;
+            vertical-align: middle;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            line-height: 1;
+            height: 0.435cm;
+        }
+
+        thead th {
+            visibility: hidden;
+        }
+
+        td:nth-child(4), td:nth-child(5), td:nth-child(6), td:nth-child(7) {
+            text-align: center;
+        }
+
+        td:nth-child(2) {
+            text-align: center;
+        }
+
+        td:nth-child(3) {
+            text-align: center;
+        }
+
+        td:nth-child(1) {
+            text-align: center;
+        }
+
+        .header-table td {
+            height: 0.68cm;
+            padding: 0;
+            vertical-align: middle;
+        }
+
+        @media print {
+            html, body {
+                margin: 0;
+                padding: 0;
+            }
+            table, tr, td, th {
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+            .print-button {
+                display: none;
+            }
+        }
+
+        /* Print button styles */
+        .print-button {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 8px 16px;
+            background-color: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <button class="print-button" onclick="window.print()">Print</button>
+    <div id="content"></div>
 </body>
 </html>`;
 
-    // Create a temporary div to parse the HTML
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = template;
+      // Write the wrapper HTML to the new window
+      printWindow.document.write(wrapperHtml);
+      printWindow.document.close();
 
-    try {
-      // Update crew info - first table
+      // Get the content div in the new window
+      const contentDiv = printWindow.document.getElementById('content');
+      if (!contentDiv) {
+        throw new Error('Failed to find content div in print window');
+      }
+
+      // Update the content with our table data
       const firstTable = tempDiv.querySelector('.header-table');
       if (firstTable) {
         const cells = firstTable.querySelectorAll('td');
@@ -363,38 +367,18 @@ const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days })
         }
       }
 
-      // Add the content to the print container
-      printContainer.innerHTML = tempDiv.innerHTML;
+      // Add the updated content to the new window's content div
+      contentDiv.innerHTML = tempDiv.innerHTML;
 
-      // Print the document
-      setTimeout(() => {
-        window.print();
-        
-        // Clean up after a short delay to ensure print completes
-        setTimeout(() => {
-          if (document.head.contains(styleElement)) {
-            document.head.removeChild(styleElement);
-          }
-          if (document.body.contains(printContainer)) {
-            document.body.removeChild(printContainer);
-          }
-        }, 1000);
-      }, 100);
     } catch (error) {
-      console.error('Error updating template:', error);
-      // Clean up on error
-      if (document.head.contains(styleElement)) {
-        document.head.removeChild(styleElement);
-      }
-      if (document.body.contains(printContainer)) {
-        document.body.removeChild(printContainer);
-      }
+      console.error('Error creating printable window:', error);
+      printWindow.close();
     }
   };
 
   return (
     <button onClick={handlePrint} className="ctr-btn print-btn">
-      Print Table
+      Open Print View
     </button>
   );
 };
