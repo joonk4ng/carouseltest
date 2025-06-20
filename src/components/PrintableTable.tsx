@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React from 'react';
 import { CrewMember, CrewInfo } from '../types/CTRTypes';
 import { calculateTotalHours } from '../utils/timeCalculations';
 
@@ -19,21 +19,85 @@ const formatDate = (dateStr: string): string => {
 };
 
 const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days }) => {
-  const printRef = useRef<HTMLDivElement>(null);
-
   const handlePrint = () => {
-    // Create a new window
+    // Open a new window with the print template
     const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert('Please allow popups to print the table');
-      return;
-    }
+    if (!printWindow) return;
 
-    // Create a temporary div to parse the HTML
-    const tempDiv = document.createElement('div');
+    // HTML template
+    const template = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <style>
+        @page {
+            margin-top: 0.45cm;
+            margin-left: 0.35cm;
+        }
 
-    // Add the table template to the temporary div
-    tempDiv.innerHTML = `
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 6pt;
+            margin: 0;
+            padding: 0;
+        }
+
+        table {
+            border-collapse: collapse;
+            margin: 0;
+            padding: 0;
+            table-layout: fixed;
+        }
+
+        th, td {
+            border: none;
+            text-align: center;
+            vertical-align: middle;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            line-height: 1;
+            height: 0.435cm;
+        }
+
+        thead th {
+            visibility: hidden;
+        }
+
+        td:nth-child(4), td:nth-child(5), td:nth-child(6), td:nth-child(7) {
+            text-align: center;
+        }
+
+        td:nth-child(2) {
+            text-align: center;
+        }
+
+        td:nth-child(3) {
+            text-align: center;
+        }
+
+        td:nth-child(1) {
+            text-align: center;
+        }
+
+        @media print {
+            html, body {
+                margin: 0;
+                padding: 0;
+            }
+            table, tr, td, th {
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+        }
+
+        .header-table td {
+            height: 0.68cm;
+            padding: 0;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
     <!-- Crew Info Table -->
     <table class="header-table">
         <colgroup>
@@ -134,251 +198,160 @@ const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days })
             <tr><td style="text-align: left; padding-left: 0.5cm; height: 0.435cm;">placeholder.</td></tr>
             <tr><td style="text-align: left; padding-left: 0.5cm; height: 0.435cm;">placeholder.</td></tr>
         </tbody>
-    </table>`;
-
-    try {
-      // First create the wrapper HTML with styles
-      const wrapperHtml = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crew Time Report</title>
-    <style>
-        @page {
-            margin-top: 0.45cm;
-            margin-left: 0.35cm;
-        }
-
-        body {
-            font-family: Arial, sans-serif;
-            font-size: 6pt;
-            margin: 0;
-            padding: 0;
-        }
-
-        table {
-            border-collapse: collapse;
-            margin: 0;
-            padding: 0;
-            table-layout: fixed;
-            width: 100%;
-        }
-
-        th, td {
-            border: none;
-            text-align: center;
-            vertical-align: middle;
-            overflow: hidden;
-            white-space: nowrap;
-            text-overflow: ellipsis;
-            line-height: 1;
-            height: 0.435cm;
-        }
-
-        thead th {
-            visibility: hidden;
-        }
-
-        td:nth-child(4), td:nth-child(5), td:nth-child(6), td:nth-child(7) {
-            text-align: center;
-        }
-
-        td:nth-child(2) {
-            text-align: center;
-        }
-
-        td:nth-child(3) {
-            text-align: center;
-        }
-
-        td:nth-child(1) {
-            text-align: center;
-        }
-
-        .header-table td {
-            height: 0.68cm;
-            padding: 0;
-            vertical-align: middle;
-        }
-
-        @media print {
-            html, body {
-                margin: 0;
-                padding: 0;
-            }
-            table, tr, td, th {
-                page-break-inside: avoid;
-                break-inside: avoid;
-            }
-            .print-button {
-                display: none;
-            }
-        }
-
-        /* Print button styles */
-        .print-button {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            padding: 8px 16px;
-            background-color: #4a90e2;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-    </style>
-</head>
-<body>
-    <button class="print-button" onclick="window.print()">Print</button>
-    <div id="content"></div>
+    </table>
 </body>
 </html>`;
 
-      // Write the wrapper HTML to the new window
-      printWindow.document.write(wrapperHtml);
-      printWindow.document.close();
+    // Create a temporary div to parse the HTML
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = template;
 
-      // Get the content div in the new window
-      const contentDiv = printWindow.document.getElementById('content');
-      if (!contentDiv) {
-        throw new Error('Failed to find content div in print window');
-      }
+    // Wait for the content to be parsed
+    setTimeout(() => {
+      try {
+        // Update crew info - first table
+        const firstTable = tempDiv.querySelector('.header-table');
+        if (firstTable) {
+          const cells = firstTable.querySelectorAll('td');
+          if (cells[0]) cells[0].textContent = crewInfo.crewName || 'Dust Busters Plus LLC';
+          if (cells[1]) cells[1].textContent = crewInfo.crewNumber || '';
+        }
 
-      // Update the content with our table data
-      const firstTable = tempDiv.querySelector('.header-table');
-      if (firstTable) {
-        const cells = firstTable.querySelectorAll('td');
-        if (cells[0]) cells[0].textContent = crewInfo.crewName || 'Dust Busters Plus LLC';
-        if (cells[1]) cells[1].textContent = crewInfo.crewNumber || '';
-      }
+        // Update fire info - second table
+        const tables = tempDiv.querySelectorAll('.header-table');
+        if (tables[1]) {
+          const cells = tables[1].querySelectorAll('td');
+          if (cells[1]) cells[1].textContent = `${crewInfo.fireName || ''}`;
+          if (cells[2]) cells[2].textContent = `${crewInfo.fireNumber || ''}`;
+        }
 
-      // Update fire info - second table
-      const tables = tempDiv.querySelectorAll('.header-table');
-      if (tables[1]) {
-        const cells = tables[1].querySelectorAll('td');
-        if (cells[1]) cells[1].textContent = `${crewInfo.fireName || ''}`;
-        if (cells[2]) cells[2].textContent = `${crewInfo.fireNumber || ''}`;
-      }
+        // Update dates - third table
+        if (tables[2]) {
+          const cells = tables[2].querySelectorAll('td');
+          if (cells[1]) cells[1].textContent = formatDate(days[0] || '');
+          if (cells[2]) cells[2].textContent = formatDate(days[1] || '');
+        }
 
-      // Update dates - third table
-      if (tables[2]) {
-        const cells = tables[2].querySelectorAll('td');
-        if (cells[1]) cells[1].textContent = formatDate(days[0] || '');
-        if (cells[2]) cells[2].textContent = formatDate(days[1] || '');
-      }
+        // Get the main table and its rows
+        const allTables = tempDiv.querySelectorAll('table');
+        const mainTable = allTables[allTables.length - 2]; // Get the second to last table (time-table)
+        if (mainTable) {
+          // First, ensure thead row is empty
+          const theadRow = mainTable.querySelector('thead tr');
+          if (theadRow) {
+            const headerCells = theadRow.querySelectorAll('th');
+            headerCells.forEach(cell => {
+              cell.textContent = '';
+            });
+          }
 
-      // Get the main table and its rows
-      const allTables = tempDiv.querySelectorAll('table');
-      const mainTable = allTables[allTables.length - 2]; // Get the second to last table (time-table)
-      if (mainTable) {
-        // First, ensure thead row is empty
-        const theadRow = mainTable.querySelector('thead tr');
-        if (theadRow) {
-          const headerCells = theadRow.querySelectorAll('th');
-          headerCells.forEach(cell => {
-            cell.textContent = '';
+          // Then handle tbody rows
+          const tbodyRows = mainTable.querySelectorAll('tbody tr');
+          
+          // Filter out empty rows from the data
+          const validData = data.filter(member => member.name || member.classification);
+
+          tbodyRows.forEach((row, index) => {
+            const cells = row.querySelectorAll('td');
+            if (cells.length < 7) {
+              console.warn(`Row ${index} does not have enough cells`);
+              return;
+            }
+
+            const member = validData[index];
+            
+            try {
+              // If we have data for this row, update it
+              if (member && member.name) {
+                // Only populate rows that have actual data
+                cells[0].textContent = ''; // Leave the first column empty
+                cells[1].textContent = member.name;
+                cells[2].textContent = member.classification;
+                cells[3].textContent = member.days[0]?.on || '';
+                cells[4].textContent = member.days[0]?.off || '';
+                cells[5].textContent = member.days[1]?.on || '';
+                cells[6].textContent = member.days[1]?.off || '';
+              } else {
+                // Clear the row if no data
+                cells.forEach(cell => {
+                  cell.textContent = '';
+                });
+              }
+            } catch (err) {
+              console.error(`Error updating row ${index}:`, err);
+            }
           });
         }
 
-        // Then handle tbody rows
-        const tbodyRows = mainTable.querySelectorAll('tbody tr');
-        
-        // Filter out empty rows from the data
-        const validData = data.filter(member => member.name || member.classification);
+        // Update remarks table
+        const remarksTable = tempDiv.querySelector('.remarks-table');
+        if (remarksTable) {
+          const remarksTbody = remarksTable.querySelector('tbody');
+          if (remarksTbody) {
+            const remarks: string[] = [];
+            
+            // Calculate total hours using the existing function
+            const totalHours = calculateTotalHours(data);
+            const formattedTotalHours = totalHours.toFixed(2);
 
-        tbodyRows.forEach((row, index) => {
-          const cells = row.querySelectorAll('td');
-          if (cells.length < 7) {
-            console.warn(`Row ${index} does not have enough cells`);
-            return;
-          }
+            // First content row (actually second row) will be HOTLINE/Travel + Total Hours
+            const firstRowText = crewInfo.checkboxStates?.hotline ? 'HOTLINE' : 'Travel';
+            const firstContentRow = `<tr><td style="text-align: left; padding-left: 0.5cm; height: 0.435cm;"><span style="display: inline-block; margin-right: 5.5cm;">${firstRowText}</span>Total Hours: ${formattedTotalHours}</td></tr>`;
+            
+            // Add checkbox-based remarks
+            if (crewInfo.checkboxStates?.noMealsLodging) remarks.push('Self Sufficient - No Meals Provided');
+            if (crewInfo.checkboxStates?.noMeals) remarks.push('Self Sufficient - No Meals & No Lodging Provided');
+            if (crewInfo.checkboxStates?.travel && crewInfo.checkboxStates?.hotline) remarks.push('Travel');
+            if (crewInfo.checkboxStates?.noLunch) remarks.push('No Lunch Taken due to Uncontrolled Fire Line');
 
-          const member = validData[index];
-          
-          try {
-            // If we have data for this row, update it
-            if (member && member.name) {
-              // Only populate rows that have actual data
-              cells[0].textContent = ''; // Leave the first column empty
-              cells[1].textContent = member.name;
-              cells[2].textContent = member.classification;
-              cells[3].textContent = member.days[0]?.on || '';
-              cells[4].textContent = member.days[0]?.off || '';
-              cells[5].textContent = member.days[1]?.on || '';
-              cells[6].textContent = member.days[1]?.off || '';
-            } else {
-              // Clear the row if no data
-              cells.forEach(cell => {
-                cell.textContent = '';
-              });
+            // Add custom entries if they exist
+            if (crewInfo.customEntries?.length) {
+              remarks.push(...crewInfo.customEntries);
             }
-          } catch (err) {
-            console.error(`Error updating row ${index}:`, err);
+
+            // Create rows for remaining remarks (up to 5 rows since first content row is used for status)
+            const remarksHtml = remarks
+              .slice(0, 5)
+              .map(remark => `<tr><td style="text-align: left; padding-left: 0.5cm; height: 0.435cm;">${remark}</td></tr>`)
+              .join('');
+
+            // Fill remaining rows with empty cells if needed
+            const emptyRowsNeeded = 5 - Math.min(remarks.length, 5);
+            const emptyRows = Array(emptyRowsNeeded > 0 ? emptyRowsNeeded : 0)
+              .fill('<tr><td style="text-align: left; padding-left: 0.5cm; height: 0.435cm;"></td></tr>')
+              .join('');
+
+            // Combine all rows with a blank first row
+            remarksTbody.innerHTML = `<tr><td style="text-align: left; height: 0.435cm;"></td></tr>` + 
+                                   firstContentRow + 
+                                   remarksHtml + 
+                                   emptyRows;
           }
-        });
-      }
-
-      // Update remarks table
-      const remarksTable = tempDiv.querySelector('.remarks-table');
-      if (remarksTable) {
-        const remarksTbody = remarksTable.querySelector('tbody');
-        if (remarksTbody) {
-          const remarks: string[] = [];
-          
-          // Calculate total hours using the existing function
-          const totalHours = calculateTotalHours(data);
-          const formattedTotalHours = totalHours.toFixed(2);
-
-          // First content row (actually second row) will be HOTLINE/Travel + Total Hours
-          const firstRowText = crewInfo.checkboxStates?.hotline ? 'HOTLINE' : 'Travel';
-          const firstContentRow = `<tr><td style="text-align: left; padding-left: 0.5cm; height: 0.435cm;"><span style="display: inline-block; width: 6.5cm;">${firstRowText}</span>Total Hours: ${formattedTotalHours}</td></tr>`;
-          
-          // Add checkbox-based remarks
-          if (crewInfo.checkboxStates?.noMealsLodging) remarks.push('Self Sufficient - No Meals Provided');
-          if (crewInfo.checkboxStates?.noMeals) remarks.push('Self Sufficient - No Meals & No Lodging Provided');
-          if (crewInfo.checkboxStates?.travel && crewInfo.checkboxStates?.hotline) remarks.push('Travel');
-          if (crewInfo.checkboxStates?.noLunch) remarks.push('No Lunch Taken due to Uncontrolled Fire Line');
-
-          // Add custom entries if they exist
-          if (crewInfo.customEntries?.length) {
-            remarks.push(...crewInfo.customEntries);
-          }
-
-          // Create rows for remaining remarks (up to 5 rows since first content row is used for status)
-          const remarksHtml = remarks
-            .slice(0, 5)
-            .map(remark => `<tr><td style="text-align: left; padding-left: 0.5cm; height: 0.435cm;">${remark}</td></tr>`)
-            .join('');
-
-          // Fill remaining rows with empty cells if needed
-          const emptyRowsNeeded = 5 - Math.min(remarks.length, 5);
-          const emptyRows = Array(emptyRowsNeeded > 0 ? emptyRowsNeeded : 0)
-            .fill('<tr><td style="text-align: left; padding-left: 0.5cm; height: 0.435cm;"></td></tr>')
-            .join('');
-
-          // Combine all rows with a blank first row
-          remarksTbody.innerHTML = `<tr><td style="text-align: left; height: 0.435cm;"></td></tr>` + 
-                                 firstContentRow + 
-                                 remarksHtml + 
-                                 emptyRows;
         }
+
+        // Write the modified content to the new window
+        printWindow.document.write('<!DOCTYPE html>');
+        printWindow.document.write(tempDiv.innerHTML);
+        printWindow.document.close();
+
+        // Print the window after ensuring content is loaded
+        printWindow.onload = () => {
+          setTimeout(() => {
+            printWindow.print();
+            // Close the window after printing (optional)
+            // printWindow.close();
+          }, 500);
+        };
+      } catch (error) {
+        console.error('Error updating template:', error);
+        printWindow.close();
       }
-
-      // Add the updated content to the new window's content div
-      contentDiv.innerHTML = tempDiv.innerHTML;
-
-    } catch (error) {
-      console.error('Error creating printable window:', error);
-      printWindow.close();
-    }
+    }, 100); // Small delay to ensure DOM is parsed
   };
 
   return (
     <button onClick={handlePrint} className="ctr-btn print-btn">
-      Open Print View
+      Print Table
     </button>
   );
 };

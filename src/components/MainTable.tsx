@@ -47,22 +47,6 @@ interface PDFData {
   timestamp: string;
 }
 
-interface CheckboxStates {
-  noMealsLodging: boolean;
-  noMeals: boolean;
-  travel: boolean;
-  noLunch: boolean;
-  hotline: boolean;
-}
-
-const defaultCheckboxStates: CheckboxStates = {
-  noMealsLodging: false,
-  noMeals: false,
-  travel: false,
-  noLunch: false,
-  hotline: true
-};
-
 const STORAGE_KEY = 'ctr-table-data';
 
 function saveData(data: CrewMember[]) {
@@ -96,7 +80,7 @@ function deepEqual(obj1: any, obj2: any): boolean {
 
 const isTouchDevice = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
-const MainTable: React.FC = () => {
+export default function MainTable() {
   const [data, setData] = useState<CrewMember[]>(defaultData);
   
   const [dayCount, setDayCount] = useState(2);
@@ -156,7 +140,13 @@ const MainTable: React.FC = () => {
 
   // Add state for collapsible section
   const [isCollapsed, setIsCollapsed] = useState(true);
-  const [checkboxStates, setCheckboxStates] = useState<CheckboxStates>(defaultCheckboxStates);
+  const [checkboxStates, setCheckboxStates] = useState({
+    noMealsLodging: false,
+    noMeals: false,
+    travel: false,
+    noLunch: false,
+    hotline: true  // Default to true
+  });
   const [customEntries, setCustomEntries] = useState<string[]>([]);
   const [newEntry, setNewEntry] = useState('');
 
@@ -401,8 +391,13 @@ const MainTable: React.FC = () => {
         fireName: '',
         fireNumber: ''
       });
-      setCheckboxStates(defaultCheckboxStates);
-      setCustomEntries([]);
+      setCheckboxStates({
+        noMealsLodging: false,
+        noMeals: false,
+        travel: false,
+        noLunch: false,
+        hotline: true
+      });
       setPdfId(null);
       return;
     }
@@ -430,8 +425,6 @@ const MainTable: React.FC = () => {
         fireName: '',
         fireNumber: ''
       });
-      setCheckboxStates(defaultCheckboxStates);
-      setCustomEntries([]);
       setPdfId(null);
       showNotification('New entry started', 'info');
       return;
@@ -447,12 +440,14 @@ const MainTable: React.FC = () => {
       const record = await ctrDataService.getRecord(dateRange);
       if (record) {
         setData(record.data);
-        const { checkboxStates: savedCheckboxStates = defaultCheckboxStates, customEntries = [], ...savedCrewInfo } = record.crewInfo;
+        const { checkboxStates = {
+          noMealsLodging: false,
+          noMeals: false,
+          travel: false,
+          noLunch: false
+        }, customEntries = [], ...savedCrewInfo } = record.crewInfo;
         setCrewInfo(savedCrewInfo);
-        setCheckboxStates({
-          ...defaultCheckboxStates,
-          ...savedCheckboxStates
-        });
+        setCheckboxStates(checkboxStates);
         setCustomEntries(customEntries);
         setDays([date1, date2]);
         setSelectedDate(dateRange);
@@ -471,10 +466,6 @@ const MainTable: React.FC = () => {
   };
 
   const handleCellDoubleClick = (rowIdx: number, field: string, dayIdx?: number) => {
-    // Prevent re-entering edit mode if already editing
-    if (editingCell?.row === rowIdx && editingCell?.field === field && editingCell?.dayIdx === dayIdx) {
-      return;
-    }
     setEditingCell({ row: rowIdx, field, dayIdx });
   };
 
@@ -597,17 +588,10 @@ const MainTable: React.FC = () => {
     setHasUnsavedChanges(true);
   };
 
-  const handleCellBlur = (e: React.FocusEvent) => {
-    // On mobile, only blur if the related target is not another input
-    // This prevents the cell from exiting edit mode when the keyboard appears
-    if (isTouchDevice && e.relatedTarget instanceof HTMLInputElement) {
-      return;
-    }
-    
-    // Use requestAnimationFrame to ensure this runs after any click handlers
-    requestAnimationFrame(() => {
+  const handleCellBlur = () => {
+    setTimeout(() => {
       setEditingCell(null);
-    });
+    }, 200);
   };
 
   const handleDelete = (idx: number) => {
@@ -883,9 +867,7 @@ const MainTable: React.FC = () => {
           onClose={hideNotification}
         />
       )}
-      <h1 className="ctr-title" aria-label="Crew Time Report Table">
-        Crew Time Report Table
-      </h1>
+      <h2 className="ctr-title">Crew Time Report Table</h2>
       
       {/* Date Selection and Save Controls */}
       <div className="ctr-date-controls">
@@ -924,7 +906,7 @@ const MainTable: React.FC = () => {
           <button 
             className="ctr-btn nav-btn" 
             onClick={handleNextEntry}
-            disabled={savedDates.length === 0 || currentDateIndex >= savedDates.length - 1}
+            disabled={currentDateIndex >= savedDates.length - 1}
           >
             Next →
           </button>
@@ -1061,11 +1043,7 @@ const MainTable: React.FC = () => {
                       <div
                         className="ctr-cell-content"
                         onDoubleClick={!isTouchDevice ? () => handleCellDoubleClick(idx, 'name') : undefined}
-                        onClick={isTouchDevice ? (e) => {
-                          e.preventDefault(); // Prevent any default touch behavior
-                          e.stopPropagation(); // Stop event bubbling
-                          handleCellDoubleClick(idx, 'name');
-                        } : undefined}
+                        onClick={isTouchDevice ? () => handleCellDoubleClick(idx, 'name') : undefined}
                       >
                         {row.name
                           ? row.name
@@ -1090,11 +1068,7 @@ const MainTable: React.FC = () => {
                       <div
                         className="ctr-cell-content"
                         onDoubleClick={!isTouchDevice ? () => handleCellDoubleClick(idx, 'classification') : undefined}
-                        onClick={isTouchDevice ? (e) => {
-                          e.preventDefault(); // Prevent any default touch behavior
-                          e.stopPropagation(); // Stop event bubbling
-                          handleCellDoubleClick(idx, 'classification');
-                        } : undefined}
+                        onClick={isTouchDevice ? () => handleCellDoubleClick(idx, 'classification') : undefined}
                       >
                         {row.classification}
                       </div>
@@ -1119,11 +1093,7 @@ const MainTable: React.FC = () => {
                           <div
                             className="ctr-cell-content"
                             onDoubleClick={!isTouchDevice ? () => handleCellDoubleClick(idx, 'on', dayIdx) : undefined}
-                            onClick={isTouchDevice ? (e) => {
-                              e.preventDefault(); // Prevent any default touch behavior
-                              e.stopPropagation(); // Stop event bubbling
-                              handleCellDoubleClick(idx, 'on', dayIdx);
-                            } : undefined}
+                            onClick={isTouchDevice ? () => handleCellDoubleClick(idx, 'on', dayIdx) : undefined}
                           >
                             {day.on}
                           </div>
@@ -1146,11 +1116,7 @@ const MainTable: React.FC = () => {
                           <div
                             className="ctr-cell-content"
                             onDoubleClick={!isTouchDevice ? () => handleCellDoubleClick(idx, 'off', dayIdx) : undefined}
-                            onClick={isTouchDevice ? (e) => {
-                              e.preventDefault(); // Prevent any default touch behavior
-                              e.stopPropagation(); // Stop event bubbling
-                              handleCellDoubleClick(idx, 'off', dayIdx);
-                            } : undefined}
+                            onClick={isTouchDevice ? () => handleCellDoubleClick(idx, 'off', dayIdx) : undefined}
                           >
                             {day.off}
                           </div>
@@ -1375,9 +1341,7 @@ const MainTable: React.FC = () => {
       )}
     </div>
   );
-};
-
-export default MainTable;
+}
 
 // Add these styles to MainTable.css
 const styles = `
