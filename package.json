@@ -11,7 +11,7 @@
     "start": "vite preview --host 0.0.0.0 --port 4173",
     "generate-icons": "node scripts/generate-icons.js",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist"
+    "deploy": "gh-pages -d dist -r https://github.com/joonk4ng/joonk4ng.github.io.git"
   },
   "dependencies": {
     "@types/nodemailer": "^6.4.17",

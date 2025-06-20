@@ -32,11 +32,24 @@ const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days })
     const styleElement = document.createElement('style');
     styleElement.textContent = `
       @media print {
-        body > *:not(.print-container) {
+        body * {
           display: none !important;
         }
-        .print-container {
+        body .print-container {
           display: block !important;
+          position: fixed !important;
+          left: 0 !important;
+          top: 0 !important;
+          width: 100% !important;
+        }
+        .print-container * {
+          display: revert !important;
+          visibility: visible !important;
+        }
+        @page {
+          margin-top: 0.45cm;
+          margin-left: 0.35cm;
+          size: auto;
         }
       }
     `;
