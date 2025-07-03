@@ -302,7 +302,35 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
       setIsSigned(true);
       setSignedPdfBlob(modifiedPdfBlob);
       
+      // Save the PDF
       onSave(modifiedPdfBlob, previewImage);
+
+      // Create a URL for the PDF blob and trigger download
+      const url = URL.createObjectURL(modifiedPdfBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Generate filename using crew info if available
+      if (crewInfo && date) {
+        link.download = generateExportFilename({
+          date,
+          crewNumber: crewInfo.crewNumber,
+          fireName: crewInfo.fireName,
+          fireNumber: crewInfo.fireNumber,
+          type: 'PDF'
+        });
+      } else {
+        link.download = 'signed_document.pdf';
+      }
+      
+      // Trigger the download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up the URL
+      URL.revokeObjectURL(url);
+
     } catch (err) {
       console.error('Error saving PDF:', err);
       setError('Failed to save PDF with annotations.');
@@ -547,32 +575,25 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
             <div className="toolbar">
               <button
                 onClick={toggleDrawingMode}
-                className={`icon-btn draw-btn ${isDrawingMode ? 'active' : ''}`} 
-                title="Draw"
+                className={`draw-btn ${isDrawingMode ? 'active' : ''}`}
+                title="Sign"
               >
                 <svg viewBox="0 0 24 24" width="24" height="24">
                   <path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
                 </svg>
+                Sign
               </button>
-              <button onClick={clearDrawing} className="icon-btn clear-btn" title="Clear Drawing">
-                <svg viewBox="0 0 24 24" width="24" height="24">
-                  <path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                </svg>
-              </button>
-              <button onClick={handleSave} className="icon-btn save-btn" title="Save with Signature">
+              <button onClick={handleSave} className="save-btn" title="Save">
                 <svg viewBox="0 0 24 24" width="24" height="24">
                   <path fill="currentColor" d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/>
                 </svg>
+                Save
               </button>
-              <button onClick={handleDownload} className="icon-btn download-btn" title="Download PDF">
+              <button onClick={clearDrawing} className="clear-btn" title="Undo">
                 <svg viewBox="0 0 24 24" width="24" height="24">
-                  <path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                  <path fill="currentColor" d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/>
                 </svg>
-              </button>
-              <button onClick={handlePrint} className="icon-btn print-btn" title="Print">
-                <svg viewBox="0 0 24 24" width="24" height="24">
-                  <path fill="currentColor" d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/>
-                </svg>
+                Undo
               </button>
             </div>
           </>

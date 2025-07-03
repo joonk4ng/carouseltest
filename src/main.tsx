@@ -10,7 +10,19 @@ if (typeof window !== 'undefined' && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 }
 
-// Register service worker
+// Create root and render app
+const rootElement = document.getElementById('root');
+if (rootElement) {
+  ReactDOM.createRoot(rootElement).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
+} else {
+  console.error('Root element not found');
+}
+
+// Register service worker after app is rendered
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
     try {
@@ -35,10 +47,4 @@ if ('serviceWorker' in navigator) {
   });
 } else {
   console.warn('Service workers are not supported in this browser');
-}
-
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-); 
+} 

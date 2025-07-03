@@ -4,9 +4,13 @@ import '../styles/MainTable.css';
 import { fillCTRPDF } from '../utils/fillCTRPDF';
 import { fillExcelTemplate } from '../utils/fillExcelTemplate';
 import { generateExportFilename } from '../utils/filenameGenerator';
-import { ctrDataService } from '../utils/CTRDataService';
+import { ctrDataServiceFallback } from '../utils/CTRDataServiceFallback';
+import { stableCTRService } from '../db/stableDexieService';
+import { saveCoordinator } from '../utils/saveCoordinator';
 import { Notification } from './Notification';
 import { mapExcelToData } from '../utils/excelMapping';
+import { SaveStatusDebug } from './SaveStatusDebug';
+import { DatabaseTest } from './DatabaseTest';
 import { CrewMember, CrewInfo, Day } from '../types/CTRTypes';
 import { calculateTotalHours } from '../utils/timeCalculations';
 import { DateCalendar } from './DateCalendar';
@@ -19,6 +23,10 @@ import type { Workbook } from 'xlsx-populate';
 import XLSX from 'xlsx';
 import PrintableTable from './PrintableTable';
 import '../styles/components/PrintableTable.css';
+import { useAutoSave } from '../hooks/useAutoSave';
+import { AutoSaveStatus } from './AutoSaveStatus';
+import '../styles/AutoSaveStatus.css';
+
 
 // TypeScript interfaces
 interface EditingCell {
@@ -128,6 +136,7 @@ export default function MainTable() {
 
   const [showCalendar, setShowCalendar] = useState(false);
   const [showCustomDatePicker, setShowCustomDatePicker] = useState<number | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
 
   const [showPDFViewer, setShowPDFViewer] = useState(false);
   const [pdfId, setPdfId] = useState<string | null>(null);
@@ -139,7 +148,7 @@ export default function MainTable() {
   const [isSigningMode, setIsSigningMode] = useState(false);
 
   // Add state for collapsible section
-  const [isCollapsed, setIsCollapsed] = useState(true);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [checkboxStates, setCheckboxStates] = useState({
     noMealsLodging: false,
     noMeals: false,
@@ -149,6 +158,47 @@ export default function MainTable() {
   });
   const [customEntries, setCustomEntries] = useState<string[]>([]);
   const [newEntry, setNewEntry] = useState('');
+
+  // Add state for scroll detection
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  // Auto-save hook with coordination
+  const autoSave = useAutoSave(selectedDate, data, {
+    ...crewInfo,
+    checkboxStates,
+    customEntries
+  }, {
+    autoSaveDelay: 2000,
+    enableAutoSave: true,
+    onSave: (dateRange) => {
+      console.log('Auto-saved:', dateRange);
+      setHasUnsavedChanges(false);
+    },
+    onError: (error) => {
+      console.error('Auto-save error:', error);
+      // Only show notification for non-initialization errors
+      if (!error.message.includes('Database failed to initialize')) {
+        showNotification('Auto-save failed. Please save manually.', 'error');
+      }
+    },
+    onSaveStart: () => {
+      console.log('Auto-save started');
+    },
+    onSaveComplete: () => {
+      console.log('Auto-save completed');
+    }
+  });
+
+  // Add scroll event listener
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrolled = window.scrollY > 10;
+      setIsScrolled(scrolled);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const handleCheckboxChange = (option: keyof typeof checkboxStates) => {
     setCheckboxStates(prev => {
@@ -192,7 +242,7 @@ export default function MainTable() {
     const initializeApp = async () => {
       await loadSavedDates();
       // Load the first available date range if any exist
-      const dateRanges = await ctrDataService.getAllDateRanges();
+      const dateRanges = await ctrDataServiceFallback.getAllDateRanges();
       
       // Load PDFs for all date ranges
       const pdfs = await listPDFs();
@@ -200,7 +250,7 @@ export default function MainTable() {
       pdfs.forEach((pdf: PDFData) => {
         const { date, crewNumber, fireName, fireNumber } = pdf.metadata;
         // Find the date range that matches this PDF's metadata
-        const matchingDateRange = dateRanges.find(range => {
+        const matchingDateRange = dateRanges.find((range: string) => {
           const [rangeDate] = range.split(' to ');
           return rangeDate === date && 
                  pdf.metadata.crewNumber === crewNumber &&
@@ -298,7 +348,7 @@ export default function MainTable() {
 
   const loadSavedDates = async () => {
     try {
-      const dateRanges = await ctrDataService.getAllDateRanges();
+      const dateRanges = await ctrDataServiceFallback.getAllDateRanges();
       setSavedDates(dateRanges);
     } catch (error) {
       console.error('Error loading saved dates:', error);
@@ -318,23 +368,45 @@ export default function MainTable() {
       showNotification('Please select both dates before saving.', 'warning');
       return;
     }
+    
+    // Check if any save is in progress
+    if (saveCoordinator.isSaveInProgress()) {
+      showNotification('Save in progress. Please wait...', 'warning');
+      return;
+    }
+    
     try {
-      const date1 = days[0];
-      const date2 = days[1];
-      await ctrDataService.saveRecord(date1, date2, data, {
-        ...crewInfo,
-        checkboxStates,
-        customEntries
+      await saveCoordinator.saveRecord({
+        dateRange: selectedDate!,
+        data,
+        crewInfo: {
+          ...crewInfo,
+          checkboxStates,
+          customEntries
+        },
+        saveType: 'manual',
+        onProgress: (message) => {
+          console.log('Manual save progress:', message);
+        },
+        onComplete: async () => {
+          await loadSavedDates();
+          
+          setLastSavedTotalHours(totalHours);
+          setLastSavedCrewInfo({ ...crewInfo });
+          
+          setHasUnsavedChanges(false);
+          showNotification('Data saved successfully!', 'success');
+
+          // Automatically propagate names to future entries
+          await handlePropagateNames(true);
+        },
+        onError: (error) => {
+          console.error('Error saving data:', error);
+          showNotification('Failed to save data. Please try again.', 'error');
+        }
       });
-      await loadSavedDates();
-      
-      setLastSavedTotalHours(totalHours);
-      setLastSavedCrewInfo({ ...crewInfo });
-      
-      setHasUnsavedChanges(false);
-      showNotification('Data saved successfully!', 'success');
     } catch (error) {
-      console.error('Error saving data:', error);
+      console.error('Error in save coordinator:', error);
       showNotification('Failed to save data. Please try again.', 'error');
     }
   };
@@ -437,14 +509,15 @@ export default function MainTable() {
 
     try {
       const [date1, date2] = dateRange.split(' to ');
-      const record = await ctrDataService.getRecord(dateRange);
+      const record = await stableCTRService.getRecord(dateRange);
       if (record) {
         setData(record.data);
         const { checkboxStates = {
           noMealsLodging: false,
           noMeals: false,
           travel: false,
-          noLunch: false
+          noLunch: false,
+          hotline: true
         }, customEntries = [], ...savedCrewInfo } = record.crewInfo;
         setCrewInfo(savedCrewInfo);
         setCheckboxStates(checkboxStates);
@@ -611,13 +684,14 @@ export default function MainTable() {
 
   const handleResetToDefault = () => {
     setData(defaultData);
-    setShowSaveDefault(false);
+    setCheckboxStates({
+      noMealsLodging: false,
+      noMeals: false,
+      travel: false,
+      noLunch: false,
+      hotline: false
+    });
     showNotification('Restored to original default data!', 'info');
-  };
-
-  const handleSaveDefault = () => {
-    setShowSaveDefault(false);
-    showNotification('Current table saved as default!', 'success');
   };
 
   const handleExportExcel = async () => {
@@ -750,7 +824,6 @@ export default function MainTable() {
           setDayCount(dates.length);
         }
         
-        setShowSaveDefault(true);
         showNotification('Excel file imported successfully', 'success');
       } catch (error) {
         console.error('Error importing Excel file:', error);
@@ -807,7 +880,7 @@ export default function MainTable() {
         }));
 
         // Save the new date range
-        await ctrDataService.saveRecord(newStartDateStr, newEndDateStr, newData, crewInfo);
+        await stableCTRService.saveRecord(newStartDateStr, newEndDateStr, newData, crewInfo);
       }
 
       // Reload saved dates
@@ -832,7 +905,7 @@ export default function MainTable() {
     }
 
     try {
-      await ctrDataService.deleteRecord(selectedDate);
+      await stableCTRService.deleteRecord(selectedDate);
       // Remove the PDF ID for this date range
       setPdfsByDateRange(prev => {
         const newPdfsByDateRange = { ...prev };
@@ -858,57 +931,134 @@ export default function MainTable() {
     }
   };
 
+  const handlePropagateNames = async (silent = false) => {
+    if (!selectedDate) {
+      if (!silent) showNotification('Please select a date range to propagate names from.', 'warning');
+      return;
+    }
+
+    if (hasUnsavedChanges) {
+      if (!silent) showNotification('Please save your current changes before propagating names.', 'warning');
+      return;
+    }
+
+    try {
+      if (!silent) showNotification('Propagating names to future entries...', 'info');
+      
+      // Get all date ranges
+      const allDateRanges = await stableCTRService.getAllDateRanges();
+      
+      // Find the current date range index
+      const currentIndex = allDateRanges.findIndex((range: string) => range === selectedDate);
+      
+      if (currentIndex === -1) {
+        if (!silent) showNotification('Could not find current date range.', 'error');
+        return;
+      }
+
+      // Get the current crew data (names and classifications)
+              const currentRecord = await stableCTRService.getRecord(selectedDate);
+      if (!currentRecord) {
+        if (!silent) showNotification('Could not load current record.', 'error');
+        return;
+      }
+
+      // Extract names and classifications from current data
+      const crewNamesAndClassifications = currentRecord.data
+        .filter((member: CrewMember) => member.name && member.classification)
+        .map((member: CrewMember) => ({
+          name: member.name,
+          classification: member.classification
+        }));
+
+      if (crewNamesAndClassifications.length === 0) {
+        if (!silent) showNotification('No crew names found in current entry.', 'warning');
+        return;
+      }
+
+      let updatedCount = 0;
+
+      // Update all future date ranges
+      for (let i = currentIndex + 1; i < allDateRanges.length; i++) {
+        const futureDateRange = allDateRanges[i];
+        const futureRecord = await stableCTRService.getRecord(futureDateRange);
+        
+        if (futureRecord) {
+          // Update names and classifications while preserving existing time entries
+          const updatedData = futureRecord.data.map((member: CrewMember, idx: number) => {
+            const updatedMember = { ...member };
+            
+            // Update name and classification if we have corresponding data
+            if (idx < crewNamesAndClassifications.length) {
+              updatedMember.name = crewNamesAndClassifications[idx].name;
+              updatedMember.classification = crewNamesAndClassifications[idx].classification;
+            }
+            
+            return updatedMember;
+          });
+
+          // Save the updated record
+          const [date1, date2] = futureDateRange.split(' to ');
+                      await stableCTRService.saveRecord(date1, date2, updatedData, futureRecord.crewInfo);
+          updatedCount++;
+        }
+      }
+
+      if (updatedCount > 0 && !silent) {
+        showNotification(`Successfully propagated names to ${updatedCount} future entries!`, 'success');
+      } else if (updatedCount === 0 && !silent) {
+        showNotification('No future entries found to update.', 'info');
+      }
+    } catch (error) {
+      console.error('Error propagating names:', error);
+      if (!silent) showNotification('Failed to propagate names. Please try again.', 'error');
+    }
+  };
+
   return (
     <div className="ctr-container">
-      {notification.show && (
-        <Notification
-          message={notification.message}
-          type={notification.type}
-          onClose={hideNotification}
-        />
-      )}
-      <h2 className="ctr-title">Crew Time Report Table</h2>
-      
-      {/* Date Selection and Save Controls */}
-      <div className="ctr-date-controls">
+      <SaveStatusDebug />
+      <DatabaseTest />
+      <div className={`ctr-sticky-header ${isScrolled ? 'scrolled' : ''}`}>
         <div className="ctr-date-selector">
-          <select 
-            value={selectedDate}
-            onChange={(e) => handleDateSelect(e.target.value)}
-            className="ctr-select"
-          >
-            {savedDates.map(dateRange => {
-              const [date1, date2] = dateRange.split(' to ');
-              return (
-                <option key={dateRange} value={dateRange}>
-                  {date1} to {date2}
-                </option>
-              );
-            })}
-            <option value="new">+ New Entry</option>
-          </select>
           <button 
-            className="ctr-btn calendar-btn"
+            className="ctr-btn calendar-btn primary"
             onClick={() => setShowCalendar(true)}
             title="Open Calendar View"
           >
-            📅
+            📅 Select Date
           </button>
+          <div className="ctr-current-date">
+            {selectedDate ? (
+              <div className="date-range">
+                {new Date(days[0]).toLocaleDateString('en-US', {
+                  month: '2-digit',
+                  day: '2-digit',
+                  year: '2-digit'
+                })}
+              </div>
+            ) : (
+              <div className="no-date">No date selected</div>
+            )}
+          </div>
         </div>
+      </div>
+
+      <div className="ctr-controls">
         <div className="ctr-navigation-buttons">
           <button 
             className="ctr-btn nav-btn" 
             onClick={handlePreviousEntry}
             disabled={currentDateIndex <= 0}
           >
-            ← Previous
+            ← Previous Day
           </button>
           <button 
             className="ctr-btn nav-btn" 
             onClick={handleNextEntry}
             disabled={currentDateIndex >= savedDates.length - 1}
           >
-            Next →
+            Next Day →
           </button>
         </div>
         <button 
@@ -927,6 +1077,26 @@ export default function MainTable() {
         </button>
       </div>
 
+      {notification.show && (
+        <Notification
+          message={notification.message}
+          type={notification.type}
+          onClose={hideNotification}
+        />
+      )}
+      
+      <AutoSaveStatus
+        dateRange={selectedDate}
+        isSaving={autoSave.isSaving}
+        lastSaved={autoSave.lastSaved}
+        pendingChangesCount={autoSave.pendingChangesCount}
+        onShowChangeHistory={() => {}}
+      />
+      
+
+      
+      <h2 className="ctr-title">Crew Time Report Table</h2>
+      
       <div className="ctr-crew-info-form">
         <input
           className="ctr-input"
@@ -953,9 +1123,112 @@ export default function MainTable() {
           onChange={e => setCrewInfo({ ...crewInfo, fireNumber: e.target.value })}
         />
       </div>
+
+      {/* Remarks Section */}
+      <div className="collapsible-section">
+        <button 
+          className="collapse-toggle"
+          onClick={() => setIsCollapsed(!isCollapsed)}
+        >
+          {isCollapsed ? '▼' : '▲'} Remarks
+        </button>
+        <div className={`collapse-content ${isCollapsed ? 'collapsed' : ''}`}>
+          <div className="checkbox-options">
+            {/* HOTLINE - interactive now */}
+            <div className="checkbox-option">
+              <input
+                type="checkbox"
+                checked={checkboxStates.hotline}
+                onChange={() => handleCheckboxChange('hotline')}
+                id="hotline-checkbox"
+              />
+              <label htmlFor="hotline-checkbox">HOTLINE</label>
+            </div>
+
+            {/* Regular interactive options */}
+            <div className="checkbox-option">
+              <input
+                type="checkbox"
+                checked={checkboxStates.noMealsLodging}
+                onChange={() => handleCheckboxChange('noMealsLodging')}
+                id="no-meals-lodging-checkbox"
+              />
+              <label htmlFor="no-meals-lodging-checkbox">Self Sufficient - No Meals Provided</label>
+            </div>
+
+            <div className="checkbox-option">
+              <input
+                type="checkbox"
+                checked={checkboxStates.noMeals}
+                onChange={() => handleCheckboxChange('noMeals')}
+                id="no-meals-checkbox"
+              />
+              <label htmlFor="no-meals-checkbox">No Meals</label>
+            </div>
+
+            <div className="checkbox-option">
+              <input
+                type="checkbox"
+                checked={checkboxStates.travel}
+                onChange={() => handleCheckboxChange('travel')}
+                id="travel-checkbox"
+              />
+              <label htmlFor="travel-checkbox">Travel</label>
+            </div>
+
+            <div className="checkbox-option">
+              <input
+                type="checkbox"
+                checked={checkboxStates.noLunch}
+                onChange={() => handleCheckboxChange('noLunch')}
+                id="no-lunch-checkbox"
+              />
+              <label htmlFor="no-lunch-checkbox">No Lunch Taken due to Uncontrolled Fire</label>
+            </div>
+
+            {/* Custom entries */}
+            {customEntries.map((entry, index) => (
+              <div key={index} className="checkbox-option">
+                <input
+                  type="checkbox"
+                  checked={true}
+                  readOnly
+                  id={`custom-entry-${index}`}
+                />
+                <label htmlFor={`custom-entry-${index}`}>{entry}</label>
+                <button 
+                  className="remove-entry"
+                  onClick={() => handleRemoveCustomEntry(entry)}
+                  aria-label="Remove entry"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+
+            {/* Add new entry section */}
+            <div className="add-entry-section">
+              <input
+                type="text"
+                value={newEntry}
+                onChange={(e) => setNewEntry(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Add new remark..."
+                className="add-entry-input"
+              />
+              <button 
+                className="add-entry-button"
+                onClick={handleAddEntry}
+                disabled={!newEntry.trim()}
+              >
+                Add
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="ctr-actions">
-        <input type="file" accept=".xlsx" onChange={handleExcelUpload} />
-        <button className="ctr-btn" onClick={handleExportExcel}>Export Excel</button>
         <button className="ctr-btn" onClick={handleExportPDF}>Save to PDF</button>
         <PrintableTable 
           data={data} 
@@ -978,10 +1251,6 @@ export default function MainTable() {
             Sign PDF
           </button>
         )}
-        {showSaveDefault && (
-          <button className="ctr-btn" onClick={handleSaveDefault} style={{ background: '#388e3c' }}>Save as Default</button>
-        )}
-        <button className="ctr-btn" onClick={handleResetToDefault} style={{ background: '#888' }}>Reset to Default</button>
         <button 
           className="ctr-btn" 
           onClick={handleRemoveEntry}
@@ -1148,110 +1417,6 @@ export default function MainTable() {
         <div className="ctr-total-value">{totalHours.toFixed(2)}</div>
       </div>
 
-      {/* Collapsible Section for Additional Options*/}
-      <div className="collapsible-section">
-        <button 
-          className="collapse-toggle"
-          onClick={() => setIsCollapsed(!isCollapsed)}
-        >
-          {isCollapsed ? '▼' : '▲'} Additional Options
-        </button>
-        <div className={`collapse-content ${isCollapsed ? 'collapsed' : ''}`}>
-          <div className="checkbox-options">
-            {/* HOTLINE - interactive now */}
-            <div className="checkbox-option">
-              <input
-                type="checkbox"
-                checked={checkboxStates.hotline}
-                onChange={() => handleCheckboxChange('hotline')}
-                id="hotline-checkbox"
-              />
-              <label htmlFor="hotline-checkbox">HOTLINE</label>
-            </div>
-
-            {/* Regular interactive options */}
-            <div className="checkbox-option">
-              <input
-                type="checkbox"
-                checked={checkboxStates.noMealsLodging}
-                onChange={() => handleCheckboxChange('noMealsLodging')}
-                id="no-meals-lodging-checkbox"
-              />
-              <label htmlFor="no-meals-lodging-checkbox">Self Sufficient - No Meals Provided</label>
-            </div>
-
-            <div className="checkbox-option">
-              <input
-                type="checkbox"
-                checked={checkboxStates.noMeals}
-                onChange={() => handleCheckboxChange('noMeals')}
-                id="no-meals-checkbox"
-              />
-              <label htmlFor="no-meals-checkbox">No Meals</label>
-            </div>
-
-            <div className="checkbox-option">
-              <input
-                type="checkbox"
-                checked={checkboxStates.travel}
-                onChange={() => handleCheckboxChange('travel')}
-                id="travel-checkbox"
-              />
-              <label htmlFor="travel-checkbox">Travel</label>
-            </div>
-
-            <div className="checkbox-option">
-              <input
-                type="checkbox"
-                checked={checkboxStates.noLunch}
-                onChange={() => handleCheckboxChange('noLunch')}
-                id="no-lunch-checkbox"
-              />
-              <label htmlFor="no-lunch-checkbox">No Lunch Taken due to Uncontrolled Fire</label>
-            </div>
-
-            {/* Custom entries */}
-            {customEntries.map((entry, index) => (
-              <div key={index} className="checkbox-option">
-                <input
-                  type="checkbox"
-                  checked={true}
-                  readOnly
-                  id={`custom-entry-${index}`}
-                />
-                <label htmlFor={`custom-entry-${index}`}>{entry}</label>
-                <button 
-                  className="remove-entry"
-                  onClick={() => handleRemoveCustomEntry(entry)}
-                  aria-label="Remove entry"
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-
-            {/* Add new entry section */}
-            <div className="add-entry-section">
-              <input
-                type="text"
-                value={newEntry}
-                onChange={(e) => setNewEntry(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Add new option..."
-                className="add-entry-input"
-              />
-              <button 
-                className="add-entry-button"
-                onClick={handleAddEntry}
-                disabled={!newEntry.trim()}
-              >
-                Add
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {showCalendar && (
         <DateCalendar
           savedDates={savedDates}
@@ -1291,7 +1456,7 @@ export default function MainTable() {
                 setIsSigningMode(false);
               }}
             >
-              ×
+              Finished
             </button>
             <EnhancedPDFViewer
               pdfId={pdfId}
@@ -1339,6 +1504,50 @@ export default function MainTable() {
           </div>
         </div>
       )}
+
+      {/* Settings container moved to bottom */}
+      <div className="settings-container">
+        <button 
+          className="settings-btn"
+          onClick={() => setShowSettings(!showSettings)}
+          title="Settings"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" />
+            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
+          </svg>
+        </button>
+        <div className={`settings-panel ${showSettings ? 'open' : ''}`}>
+          <div className="settings-btn-group">
+            <label className="settings-btn-item file-input-label">
+              <input type="file" accept=".xlsx" onChange={handleExcelUpload} />
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                <path d="M7 10l5 5 5-5" />
+                <path d="M12 15V3" />
+              </svg>
+              Import Excel
+            </label>
+            <button className="settings-btn-item" onClick={handleExportExcel}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                <path d="M7 10l5 5 5-5" />
+                <path d="M12 15V3" />
+              </svg>
+              Export Excel
+            </button>
+            <button className="settings-btn-item" onClick={handleResetToDefault}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 12a9 9 0 019-9 9.75 9.75 0 017.071 3.172L21 8" />
+                <path d="M21 3v5h-5" />
+                <path d="M21 12a9 9 0 01-9 9 9.75 9.75 0 01-7.071-3.172L3 16" />
+                <path d="M3 21v-5h5" />
+              </svg>
+              Reset to Default
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
