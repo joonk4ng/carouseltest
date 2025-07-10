@@ -1,4 +1,291 @@
 /* Mobile MainTable styles */
+@media screen and (max-width: 768px) {
+  /* Set up proper viewport handling */
+  html, body {
+    overflow-x: hidden;
+    position: relative;
+    width: 100%;
+  }
+
+  /* Main container */
+  .ctr-container {
+    width: 100%;
+    padding: 8px;
+    margin: 0;
+    overflow-x: hidden;
+    padding-top: 140px; /* Space for fixed header */
+    position: relative;
+  }
+
+  /* Fixed header styles */
+  .ctr-sticky-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    background: white;
+    padding: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    display: flex !important;
+    flex-direction: column;
+    width: 100%;
+    transform: translateZ(0); /* Force GPU acceleration */
+    -webkit-transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-overflow-scrolling: touch;
+    will-change: transform;
+    height: auto;
+    min-height: fit-content;
+  }
+
+  /* Ensure header stays visible */
+  .ctr-sticky-header.hidden {
+    transform: none !important;
+    -webkit-transform: none !important;
+    display: flex !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+
+  /* Table container with proper scroll handling */
+  .ctr-table-container {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-bottom: 16px;
+    position: relative;
+    margin-top: 8px;
+    max-width: 100%;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+  }
+
+  /* Table header cells */
+  .ctr-th {
+    background-color: #f5f5f5;
+    padding: 8px 4px;
+    text-align: center;
+    border: 1px solid #ddd;
+    font-weight: bold;
+    position: sticky;
+    top: 140px; /* Match container padding-top */
+    z-index: 8;
+    height: auto;
+    vertical-align: middle;
+  }
+
+  /* Ensure proper stacking context */
+  .ctr-table {
+    width: 100%;
+    min-width: 600px;
+    border-collapse: collapse;
+    font-size: 14px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Force hardware acceleration for smoother scrolling */
+  * {
+    -webkit-transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 0);
+  }
+
+  .ctr-th.name-header {
+    min-width: 120px;
+    max-width: 120px;
+    text-align: left;
+  }
+
+  .ctr-th.job-title-header {
+    min-width: 80px;
+    max-width: 80px;
+  }
+
+  .ctr-th.date-header {
+    min-width: 140px;
+    padding: 4px;
+  }
+
+  .ctr-th.actions-header {
+    width: 40px;
+    min-width: 40px;
+  }
+
+  /* Date header content */
+  .date-header-content {
+    margin-bottom: 4px;
+    font-size: 12px;
+    line-height: 1.2;
+  }
+
+  .time-header-row {
+    display: flex;
+    justify-content: space-around;
+    font-size: 11px;
+    color: #666;
+    margin-top: 4px;
+  }
+
+  /* Cell styles */
+  .ctr-td {
+    padding: 8px 4px;
+    text-align: center;
+    border: 1px solid #ddd;
+    vertical-align: middle;
+    height: 44px; /* Minimum touch target */
+  }
+
+  .ctr-td:first-child {
+    text-align: left;
+    padding-left: 8px;
+  }
+
+  /* Input styles */
+  .ctr-td input {
+    width: 100%;
+    padding: 8px 4px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    height: 36px;
+  }
+
+  .ctr-td input[type="time"] {
+    width: 85px;
+    padding: 4px;
+    -webkit-appearance: none;
+    background: white;
+  }
+
+  /* Delete button */
+  .delete-btn {
+    padding: 8px;
+    width: 32px;
+    height: 32px;
+    background: #d32f2f;
+    border: none;
+    border-radius: 4px;
+    color: white;
+    font-size: 16px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+    touch-action: manipulation;
+  }
+
+  /* Scroll indicator */
+  .ctr-table-container::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 20px;
+    background: linear-gradient(to right, transparent, rgba(0,0,0,0.1));
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .ctr-table-container.has-overflow::after {
+    opacity: 1;
+  }
+
+  /* Date input styles */
+  .ctr-date-input {
+    width: 100%;
+    padding: 4px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 12px;
+    background: white;
+    text-align: center;
+  }
+
+  .ctr-date-input::-webkit-calendar-picker-indicator {
+    margin: 0;
+    padding: 0;
+    width: 16px;
+    height: 16px;
+  }
+
+  .ctr-date-input::-webkit-datetime-edit {
+    padding: 0;
+  }
+
+  .ctr-date-input::-webkit-datetime-edit-fields-wrapper {
+    padding: 0;
+  }
+
+  /* Ensure date inputs are touch-friendly */
+  input[type="date"] {
+    min-height: 36px;
+    touch-action: manipulation;
+  }
+
+  .ctr-date-selector {
+    flex-direction: row;
+    gap: 8px;
+    width: 100%;
+    align-items: center;
+    padding: 0 8px;
+  }
+
+  .calendar-btn.primary {
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+    min-width: auto;
+  }
+
+  .ctr-current-date {
+    font-size: 0.9rem;
+    padding: 8px;
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .ctr-navigation-buttons {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    margin-top: 8px;
+    padding: 0 8px;
+  }
+
+  .nav-btn {
+    flex: 1;
+    white-space: nowrap;
+    padding: 8px;
+    font-size: 0.9rem;
+  }
+
+  /* Ensure content scrolls under fixed header */
+  .ctr-table-container {
+    margin-top: 8px;
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+  }
+
+  /* Hide any potential scroll bars on the body when modal is open */
+  body.modal-open {
+    overflow: hidden;
+  }
+}
+
+/* Ensure inputs are touch-friendly */
+@media (hover: none) and (pointer: coarse) {
+  .ctr-td input,
+  .delete-btn {
+    touch-action: manipulation;
+  }
+}
+
 .ctr-container {
   width: var(--mobile-container-width);
   margin: 0;
@@ -22,13 +309,10 @@
   font-size: var(--mobile-font-size);
   display: block;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
   white-space: nowrap;
-}
-
-.ctr-th, .ctr-td {
-  padding: 8px 4px;
-  text-align: left;
-  border-bottom: 1px solid var(--border-color);
+  border: 1px solid var(--border-color);
 }
 
 .ctr-th {
@@ -37,10 +321,32 @@
   position: sticky;
   top: 0;
   z-index: 10;
+  min-width: 80px;
+  padding: 8px 4px;
+  font-size: 12px;
+  white-space: normal;
+  height: auto;
+  vertical-align: top;
+}
+
+.ctr-th.date-header {
+  min-width: 100px;
+  text-align: center;
+}
+
+.ctr-th.name-header {
+  min-width: 120px;
+}
+
+.ctr-th.job-title-header {
+  min-width: 100px;
 }
 
 .ctr-td {
-  vertical-align: top;
+  vertical-align: middle;
+  padding: 8px 4px;
+  min-height: 44px;
+  position: relative;
 }
 
 .ctr-td input {
@@ -49,6 +355,8 @@
   border: 1px solid var(--border-color);
   border-radius: 4px;
   font-size: var(--mobile-font-size);
+  min-height: 36px;
+  padding: 4px 8px;
 }
 
 .ctr-td input:focus {
@@ -390,4 +698,463 @@
   width: 100%;
   padding: 12px;
   font-size: 16px;
+}
+
+/* Date header styles */
+.date-header-content {
+  margin-bottom: 4px;
+  font-size: 12px;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.time-header-row {
+  display: flex;
+  justify-content: space-around;
+  font-size: 11px;
+  color: #666;
+}
+
+/* Time input styles */
+.ctr-td input[type="time"] {
+  width: 85px;
+  padding: 4px;
+  font-size: 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: white;
+  -webkit-appearance: none;
+}
+
+/* Delete button styles */
+.delete-btn {
+  padding: 8px;
+  min-width: 32px;
+  height: 32px;
+  background: var(--primary-color);
+  border: none;
+  border-radius: 4px;
+  color: white;
+  font-size: 16px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+}
+
+/* Add horizontal scroll indicator */
+.ctr-table-container {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+
+.ctr-table-container::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 24px;
+  background: linear-gradient(to right, transparent, rgba(0,0,0,0.1));
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.ctr-table-container.has-overflow::after {
+  opacity: 1;
+}
+
+/* Prevent any potential z-index issues */
+* {
+  transform: translate3d(0, 0, 0);
+}
+
+/* Ensure smooth scrolling */
+html, body {
+  -webkit-overflow-scrolling: touch;
+  overflow-x: hidden;
+}
+
+/* Date input in header */
+.ctr-date {
+  font-weight: bold;
+  font-size: 14px;
+  text-align: center;
+  background: transparent !important;
+  border: none;
+  border-bottom: 1.5px solid #d32f2f;
+  width: 100%;
+  padding: 4px;
+  margin: 0;
+}
+
+/* Ensure sticky header stays on top */
+.ctr-sticky-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: white;
+  padding: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: flex !important;
+  flex-direction: column;
+  width: 100%;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: transform;
+}
+
+/* Remove any transform animations that might interfere with fixed positioning */
+.ctr-sticky-header.hidden {
+  display: flex !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+/* Ensure container accounts for fixed header */
+.ctr-container {
+  width: 100%;
+  padding: 8px;
+  margin: 0;
+  overflow-x: hidden;
+  padding-top: 140px; /* Increased padding to account for header height */
+}
+
+/* Ensure table header doesn't overlap with fixed header */
+.ctr-th {
+  position: sticky;
+  top: 140px; /* Match the container padding-top */
+  z-index: 8; /* Below the fixed header */
+  background-color: #f5f5f5;
+} 
+
+/* Override sticky header behavior */
+@media (max-width: 768px) {
+  .ctr-sticky-header {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 9999 !important;
+    background: white !important;
+    transform: none !important;
+    -webkit-transform: none !important;
+    transition: none !important;
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+
+  .ctr-container {
+    padding-top: 140px !important;
+    margin-top: 0 !important;
+  }
+
+  .ctr-table-container {
+    margin-top: 0 !important;
+  }
+
+  .ctr-th {
+    position: sticky !important;
+    top: 140px !important;
+    z-index: 8 !important;
+  }
+
+  body {
+    overflow-x: hidden !important;
+    width: 100% !important;
+    position: relative !important;
+  }
+} 
+
+/* Mobile-specific navigation and crew info styles */
+@media (max-width: 768px) {
+  /* Navigation buttons */
+  .ctr-navigation-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    margin-top: 8px;
+  }
+
+  .ctr-navigation-buttons .ctr-btn {
+    width: 100%;
+    min-height: 44px;
+    font-size: 16px;
+    padding: 12px;
+    margin: 0;
+  }
+
+  /* Crew info section */
+  .crew-info-section {
+    padding: 16px 8px;
+  }
+
+  .crew-info-row {
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .crew-info-field {
+    width: 100%;
+  }
+
+  .crew-info-field label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+  }
+
+  .crew-info-field input {
+    width: 100%;
+    min-height: 44px;
+    padding: 8px 12px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+  }
+
+  /* Collapsible section */
+  .collapsible-section {
+    margin-top: 16px;
+    padding: 0 8px;
+  }
+
+  .collapse-toggle {
+    width: 100%;
+    min-height: 44px;
+    padding: 12px;
+    font-size: 16px;
+    text-align: left;
+    background: #f5f5f5;
+    border: none;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .checkbox-options {
+    padding: 16px 8px;
+  }
+
+  .checkbox-option {
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .checkbox-option input[type="checkbox"] {
+    width: 24px;
+    height: 24px;
+    margin: 0;
+  }
+
+  .checkbox-option label {
+    font-size: 16px;
+    line-height: 1.4;
+    flex: 1;
+  }
+
+  /* Copy to Next Days button */
+  .copy-btn {
+    width: 100%;
+    min-height: 44px;
+    margin-top: 8px;
+    font-size: 16px;
+    padding: 12px;
+  }
+
+  /* AutoSave status */
+  .auto-save-status {
+    margin: 8px;
+    padding: 8px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  /* Table container */
+  .ctr-table-container {
+    margin-top: 16px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Table cells */
+  .ctr-td input {
+    min-height: 44px;
+    font-size: 16px;
+    padding: 8px;
+  }
+
+  /* Notification */
+  .notification {
+    position: fixed;
+    bottom: 16px;
+    left: 16px;
+    right: 16px;
+    z-index: 9999;
+    padding: 16px;
+    border-radius: 8px;
+    font-size: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  }
+} 
+
+/* Mobile-specific crew info styles */
+@media (max-width: 768px) {
+  /* Crew info section */
+  .crew-info-section {
+    width: 100%;
+    padding: 8px;
+    margin: 8px 0;
+    background: white;
+    box-sizing: border-box;
+  }
+
+  .crew-info-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+  }
+
+  .crew-info-field {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  .crew-info-field label {
+    display: block;
+    width: 100%;
+    margin-bottom: 4px;
+    font-size: 14px;
+    color: #666;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  .crew-info-field input {
+    display: block;
+    width: 100%;
+    height: 40px;
+    padding: 8px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: white;
+    margin: 0;
+    box-sizing: border-box;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .crew-info-field input:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+  }
+
+  /* Title styling */
+  .ctr-title {
+    font-size: 18px;
+    color: rgb(220, 38, 38);
+    margin: 16px 0;
+    font-weight: bold;
+    padding: 0 8px;
+  }
+
+  /* Container adjustments */
+  .ctr-container {
+    padding: 8px;
+    padding-top: 100px; /* Adjust based on your header height */
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Prevent input zoom on iOS */
+  @media screen and (-webkit-min-device-pixel-ratio: 0) {
+    .crew-info-field input {
+      font-size: 16px;
+    }
+  }
+}
+
+/* Desktop styles */
+@media (min-width: 769px) {
+  .crew-info-section {
+    position: static;
+  }
+} 
+
+@media (max-width: 768px) {
+  .ctr-sticky-header {
+    padding: 8px 12px;
+  }
+
+  .ctr-header-stack {
+    gap: 8px;
+  }
+
+  .ctr-date-selector {
+    gap: 8px;
+  }
+
+  .ctr-btn.calendar-btn.primary {
+    padding: 8px;
+    font-size: 0.9rem;
+  }
+
+  .ctr-current-date {
+    padding: 8px;
+    font-size: 0.85rem;
+  }
+
+  .ctr-navigation {
+    gap: 6px;
+  }
+
+  .ctr-copy-button {
+    margin-top: 2px;
+  }
+
+  .ctr-btn {
+    padding: 8px;
+    font-size: 0.9rem;
+    white-space: nowrap;
+  }
+
+  .ctr-btn.undo-btn {
+    padding: 10px;
+  }
+
+  /* Hide text on very small screens */
+  @media (max-width: 360px) {
+    .ctr-sticky-header .undo-btn span {
+      display: none;
+    }
+    
+    .ctr-sticky-header .undo-btn {
+      padding: 8px;
+      aspect-ratio: 1;
+    }
+  }
 } 

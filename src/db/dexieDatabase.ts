@@ -1,5 +1,5 @@
 import Dexie, { Table } from 'dexie';
-import { CrewMember, CrewInfo } from '../types/CTRTypes';
+import { CrewMember, CrewInfo, TableData } from '../types/CTRTypes';
 
 // Define the database schema
 export interface CTRRecord {
@@ -23,7 +23,7 @@ export interface ChangeLog {
 }
 
 // Extend Dexie to add our tables
-export class CTRDatabase extends Dexie {
+export class DexieDatabase extends Dexie {
   ctrRecords!: Table<CTRRecord>;
   changeLog!: Table<ChangeLog>;
   pendingChanges!: Table<{
@@ -32,6 +32,16 @@ export class CTRDatabase extends Dexie {
     changes: Partial<CTRRecord>;
     timestamp: number;
   }>;
+  tableData!: Dexie.Table<TableData, string>;
+  dates!: Dexie.Table<{ date: string }, string>;
+  changes!: Dexie.Table<{ 
+    id?: number,
+    date: string,
+    field: string,
+    oldValue: string,
+    newValue: string,
+    timestamp: number 
+  }, number>;
 
   constructor() {
     super('CTRDatabase');
@@ -41,7 +51,19 @@ export class CTRDatabase extends Dexie {
     this.version(1).stores({
       ctrRecords: 'id, dateRange, lastModified',
       changeLog: '++id, dateRange, timestamp',
-      pendingChanges: '++id, dateRange, timestamp'
+      pendingChanges: '++id, dateRange, timestamp',
+      tableData: 'date',
+      dates: 'date'
+    });
+
+    // Add changes table in version 2
+    this.version(2).stores({
+      ctrRecords: 'id, dateRange, lastModified',
+      changeLog: '++id, dateRange, timestamp',
+      pendingChanges: '++id, dateRange, timestamp',
+      tableData: 'date',
+      dates: 'date',
+      changes: '++id, date, field, timestamp'
     });
 
     console.log('Database schema defined');
@@ -63,32 +85,12 @@ export class CTRDatabase extends Dexie {
   }
 }
 
-// Create database instance
-let db: CTRDatabase | null = null;
-
-// Initialize database
-export const initializeDatabase = async (): Promise<CTRDatabase> => {
-  try {
-    if (!db) {
-      console.log('Creating new CTRDatabase instance...');
-      db = new CTRDatabase();
-      console.log('Database instance created, opening...');
-      // Ensure database is ready
-      await db.open();
-      console.log('Database opened successfully');
-    } else {
-      console.log('Using existing database instance');
-    }
-    return db;
-  } catch (error) {
-    console.error('Error initializing database:', error);
-    throw error;
-  }
-};
+// Create and export a single database instance
+export const db = new DexieDatabase();
 
 // Service class for CTR operations with change tracking
 export class CTRDataServiceWithTracking {
-  private db: CTRDatabase | null = null;
+  private db: DexieDatabase | null = null;
   private initPromise: Promise<void> | null = null;
 
   constructor() {
@@ -98,7 +100,7 @@ export class CTRDataServiceWithTracking {
 
   private async initDB() {
     if (!this.db) {
-      this.db = await initializeDatabase();
+      this.db = new DexieDatabase();
     }
   }
 

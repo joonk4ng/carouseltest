@@ -1,162 +1,166 @@
 /* Mobile-specific styles */
-:root {
-  --mobile-container-width: 100%;
-  --mobile-padding: 16px;
-  --mobile-font-size: 14px;
-  --mobile-spacing: 16px;
-}
+@media (max-width: 768px) {
+  :root {
+    --mobile-container-width: 100%;
+    --mobile-padding: 16px;
+    --mobile-font-size: 14px;
+    --mobile-spacing: 16px;
+  }
 
-/* Main container styles */
-.app-container {
-  width: var(--mobile-container-width);
-  margin: 0;
-  padding: var(--mobile-padding);
-  background: #fff;
-  border-radius: 0;
-  box-shadow: none;
-}
+  /* Ensure proper scrolling behavior */
+  html, body {
+    overflow-x: hidden;
+    position: relative;
+    -webkit-overflow-scrolling: touch;
+    height: 100%;
+  }
 
-/* Typography */
-h1 {
-  font-size: 24px;
-  margin-bottom: var(--mobile-spacing);
-}
+  body {
+    margin: 0;
+    padding: 0;
+  }
 
-h2 {
-  font-size: 20px;
-  margin-bottom: calc(var(--mobile-spacing) * 0.75);
-}
+  /* Main container styles */
+  .app-container {
+    width: var(--mobile-container-width);
+    margin: 0;
+    padding: var(--mobile-padding);
+    background: #fff;
+    border-radius: 0;
+    box-shadow: none;
+    min-height: 100%;
+    position: relative;
+    overflow-x: hidden;
+  }
 
-/* Form elements */
-input[type="text"],
-input[type="number"],
-select {
-  padding: 10px;
-  font-size: var(--mobile-font-size);
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  width: 100%;
-  margin-bottom: var(--mobile-spacing);
-}
+  /* Typography */
+  .app-container h1 {
+    font-size: 24px;
+    margin-bottom: var(--mobile-spacing);
+  }
 
-/* Buttons */
-button {
-  padding: 10px 16px;
-  font-size: var(--mobile-font-size);
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  width: 100%;
-  margin-bottom: 8px;
-}
+  .app-container h2 {
+    font-size: 20px;
+    margin-bottom: calc(var(--mobile-spacing) * 0.75);
+  }
 
-/* Tables */
-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: var(--mobile-spacing) 0;
-  font-size: var(--mobile-font-size);
-}
+  /* Form elements */
+  .app-container input[type="text"],
+  .app-container input[type="number"],
+  .app-container select {
+    padding: 10px;
+    font-size: var(--mobile-font-size);
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    width: 100%;
+    margin-bottom: var(--mobile-spacing);
+    min-height: 44px; /* Minimum touch target size */
+  }
 
-th, td {
-  padding: 8px;
-  text-align: left;
-  border-bottom: 1px solid #eee;
-}
+  /* Buttons */
+  .app-container button {
+    padding: 10px 16px;
+    font-size: var(--mobile-font-size);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    width: 100%;
+    margin-bottom: 8px;
+    min-height: 44px; /* Minimum touch target size */
+  }
 
-/* Grid layouts */
-.grid-container {
-  display: flex;
-  flex-direction: column;
-  gap: var(--mobile-spacing);
-  margin: var(--mobile-spacing) 0;
-}
-
-/* Navigation */
-.nav-menu {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: var(--mobile-spacing);
-}
-
-/* Cards */
-.card {
-  padding: var(--mobile-spacing);
-  border-radius: 4px;
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-  margin-bottom: var(--mobile-spacing);
-}
-
-/* Modals */
-.modal-content {
-  width: 100%;
-  height: 100%;
-  padding: var(--mobile-spacing);
-  border-radius: 0;
-  margin: 0;
-}
-
-/* PDF Viewer */
-.pdf-viewer-container {
-  height: calc(100vh - 100px);
-  padding: var(--mobile-spacing);
-}
-
-/* Toolbar */
-.toolbar {
-  padding: var(--mobile-spacing);
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-/* Signature canvas */
-.signature-canvas-container {
-  width: 100%;
-  height: 200px;
-  margin: var(--mobile-spacing) 0;
-}
-
-/* Date picker */
-.date-picker {
-  width: 100%;
-  padding: var(--mobile-spacing);
-}
-
-/* Notifications */
-.notification {
-  padding: 12px 16px;
-  width: 100%;
-  max-width: none;
-  margin: 0;
-  border-radius: 0;
-}
-
-/* Touch-friendly elements */
-button,
-input,
-select {
-  min-height: 44px; /* Minimum touch target size */
-}
-
-/* Stack elements vertically on mobile */
-.form-group,
-.action-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-/* Optimize table for mobile */
-@media (max-width: 480px) {
-  table {
+  /* Tables */
+  .app-container table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: var(--mobile-spacing) 0;
+    font-size: var(--mobile-font-size);
     display: block;
     overflow-x: auto;
     white-space: nowrap;
   }
-  
-  th, td {
+
+  .app-container th,
+  .app-container td {
     padding: 8px 4px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+  }
+
+  /* Grid layouts */
+  .app-container .grid-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mobile-spacing);
+    margin: var(--mobile-spacing) 0;
+  }
+
+  /* Navigation */
+  .app-container .nav-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: var(--mobile-spacing);
+  }
+
+  /* Cards */
+  .app-container .card {
+    padding: var(--mobile-spacing);
+    border-radius: 4px;
+    background: #fff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: var(--mobile-spacing);
+  }
+
+  /* Modals */
+  .app-container .modal-content {
+    width: 100%;
+    height: 100%;
+    padding: var(--mobile-spacing);
+    border-radius: 0;
+    margin: 0;
+  }
+
+  /* PDF Viewer */
+  .app-container .pdf-viewer-container {
+    height: calc(100vh - 100px);
+    padding: var(--mobile-spacing);
+  }
+
+  /* Toolbar */
+  .app-container .toolbar {
+    padding: var(--mobile-spacing);
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  /* Signature canvas */
+  .app-container .signature-canvas-container {
+    width: 100%;
+    height: 200px;
+    margin: var(--mobile-spacing) 0;
+  }
+
+  /* Date picker */
+  .app-container .date-picker {
+    width: 100%;
+    padding: var(--mobile-spacing);
+  }
+
+  /* Notifications */
+  .app-container .notification {
+    padding: 12px 16px;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    border-radius: 0;
+  }
+
+  /* Stack elements vertically on mobile */
+  .app-container .form-group,
+  .app-container .action-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
   }
 } 

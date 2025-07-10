@@ -23,4 +23,28 @@ export interface CrewInfo {
     hotline: boolean;
   };
   customEntries?: string[];
+}
+
+export interface CellChange {
+  field: string;
+  oldValue: string | boolean | object | any[];
+  newValue: string | boolean | object | any[];
+}
+
+export interface ChangeSet {
+  changes: CellChange[];
+  date: string;
+  timestamp: number;
+}
+
+export interface TableData {
+  date: string;
+  [key: string]: string;  // Allow any string key for dynamic position/name pairs
+}
+
+export interface LastEdit {
+  rowIndex: number;
+  field: string;
+  dayIndex?: number;  // For time entries
+  originalValue: string;
 } 

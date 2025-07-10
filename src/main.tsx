@@ -4,11 +4,18 @@ import * as pdfjsLib from 'pdfjs-dist';
 import './utils/polyfills';  // Import all polyfills
 import './styles/main.css';  // Import our new main styles
 import App from './App';
+import './index.css';
+import { db } from './db/dexieDatabase';
 
 // Configure PDF.js worker
 if (typeof window !== 'undefined' && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 }
+
+// Initialize database
+db.open().catch(err => {
+  console.error('Failed to open database:', err);
+});
 
 // Create root and render app
 const rootElement = document.getElementById('root');

@@ -1,6 +1,19 @@
 /* Root variables */
 :root {
   --table-width: 800px;
+  --primary-color: #2962ff;
+  --primary-hover: #1565c0;
+  --danger-color: #f50057;
+  --danger-hover: #c51162;
+  --success-color: #00c853;
+  --success-hover: #00a041;
+  --neutral-color: #546e7a;
+  --neutral-hover: #455a64;
+}
+
+/* Base styles */
+* {
+  box-sizing: border-box;
 }
 
 .ctr-container {
@@ -8,6 +21,7 @@
   padding: 20px;
   max-width: var(--table-width, 100%);
   margin: 0 auto;
+  padding-top: 120px; /* Space for fixed header */
 }
 
 /* Optimize title for LCP */
@@ -22,6 +36,7 @@
   will-change: auto;
   transform: translateZ(0);
   backface-visibility: hidden;
+  margin-top: 0;
 }
 
 .ctr-crew-info-form {
@@ -446,7 +461,7 @@
 /* Mobile optimizations */
 @media (max-width: 768px) {
   .ctr-container {
-    padding: 8px;
+    padding-top: 120px; /* Space for fixed header */
   }
 
   .ctr-title {
@@ -495,82 +510,152 @@
   }
 }
 
+/* Sticky header */
 .ctr-sticky-header {
-  display: none; /* Hidden by default, shown only on mobile */
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: white;
+  padding: 12px 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.3s ease;
 }
 
-.ctr-controls {
+.ctr-sticky-header.scrolled {
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
+}
+
+/* Stack container */
+.ctr-header-stack {
   display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 1rem;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 12px;
+  max-width: var(--table-width);
+  margin: 0 auto;
   width: 100%;
-  max-width: var(--table-width, 100%);
-  margin-left: auto;
-  margin-right: auto;
 }
 
+/* Top row with date selector */
 .ctr-date-selector {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 0;
-  flex: 0 0 auto;
-  min-width: 320px;
+  gap: 12px;
+  width: 100%;
 }
 
-.calendar-btn.primary {
-  flex: 0 0 auto;
-  min-width: 150px;
-  background: var(--primary-color);
+.ctr-btn.calendar-btn.primary {
+  width: auto;
+  min-width: 120px;
+  padding: 8px 16px;
+  background-color: var(--primary-color);
   color: white;
-  font-size: 1rem;
-  padding: 12px 20px;
-  border: none;
+  font-size: 0.9rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  transition: all 0.2s ease;
-  border-radius: 8px;
+  gap: 6px;
 }
 
-.calendar-btn.primary:hover {
-  background: #8b0000;
-  transform: translateY(-1px);
+.ctr-btn.calendar-btn.primary:hover:not(:disabled) {
+  background-color: var(--primary-hover);
 }
 
 .ctr-current-date {
-  min-width: 120px;
-  padding: 12px 20px;
-  background: #f5f5f5;
-  border-radius: 8px;
-  font-size: 1.1rem;
-  color: #333;
-  text-align: center;
-  border: 1px solid #e0e0e0;
+  flex: 1;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+/* Undo button */
+.ctr-btn.undo-btn {
+  width: 100%;
+  padding: 12px 16px;
+  background-color: var(--danger-color);
+  color: white;
+  font-size: 1rem;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.ctr-current-date .date-range {
-  font-weight: 500;
-  color: var(--primary-color);
-  white-space: nowrap;
-}
-
-.ctr-current-date .no-date {
-  color: #666;
-  font-style: italic;
-  white-space: nowrap;
-}
-
-.ctr-navigation-buttons {
-  display: flex;
   gap: 8px;
-  margin-left: auto;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  margin-top: 4px;
+}
+
+.ctr-btn.undo-btn:hover:not(:disabled) {
+  background-color: var(--danger-hover);
+  transform: translateY(-1px);
+}
+
+.ctr-btn.undo-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ctr-btn.undo-btn .undo-text {
+  font-weight: 500;
+}
+
+/* Mobile styles */
+@media (max-width: 768px) {
+  .ctr-sticky-header {
+    padding: 8px 12px;
+  }
+
+  .ctr-header-stack {
+    gap: 8px;
+  }
+
+  .ctr-date-selector {
+    gap: 8px;
+  }
+
+  .ctr-btn.calendar-btn.primary {
+    padding: 8px;
+    font-size: 0.85rem;
+    min-width: auto;
+  }
+
+  .ctr-current-date {
+    padding: 8px;
+    font-size: 0.85rem;
+  }
+
+  .ctr-btn.undo-btn {
+    padding: 10px;
+    font-size: 0.9rem;
+    margin-top: 2px;
+  }
+
+  /* Hide text on very small screens */
+  @media (max-width: 360px) {
+    .ctr-btn.undo-btn .undo-text {
+      display: none;
+    }
+    
+    .ctr-btn.undo-btn {
+      padding: 10px;
+      aspect-ratio: 1;
+    }
+  }
+}
+
+/* Navigation buttons */
+.ctr-navigation {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ctr-copy-button {
+  grid-column: 1 / -1;
+  margin-top: 4px;
 }
 
 /* Navigation button styles */
@@ -611,10 +696,67 @@
   background: #1565c0;
 }
 
+/* Undo button styles */
+.undo-btn {
+  background: #607d8b;
+  min-width: 100px;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.undo-btn:not(:disabled):hover {
+  background: #455a64;
+}
+
+.undo-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+/* Undo button in sticky header */
+.ctr-sticky-header .undo-btn {
+  background-color: var(--danger-color);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+  min-width: 100px;
+}
+
+.ctr-sticky-header .undo-btn:hover:not(:disabled) {
+  background-color: var(--danger-hover);
+}
+
+.ctr-sticky-header .undo-btn:disabled {
+  background-color: #ddd;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Calendar button */
+.ctr-sticky-header .calendar-btn.primary {
+  background-color: var(--primary-color);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+}
+
+.ctr-sticky-header .calendar-btn.primary:hover {
+  background-color: var(--primary-hover);
+}
+
 /* Mobile optimizations */
 @media (max-width: 768px) {
   .ctr-container {
-    padding-top: 80px; /* Reduced padding since we have fewer fixed elements */
+    padding-top: 120px; /* Space for fixed header */
   }
 
   .ctr-sticky-header {
@@ -1214,5 +1356,62 @@
 
   .settings-panel {
     width: 180px;
+  }
+}
+
+.crew-info-section {
+  margin: 20px 0;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.crew-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  width: 100%;
+}
+
+.crew-info-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.crew-info-field label {
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.crew-info-field input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+  transition: border-color 0.2s ease;
+  height: 40px;
+  box-sizing: border-box;
+}
+
+.crew-info-field input:focus {
+  border-color: #4a90e2;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.1);
+}
+
+@media (max-width: 768px) {
+  .crew-info-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .crew-info-field input {
+    font-size: 16px;
+    height: 44px;
   }
 } 

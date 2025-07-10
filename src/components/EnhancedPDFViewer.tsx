@@ -8,9 +8,7 @@ import { generateExportFilename } from '../utils/filenameGenerator';
 
 // Configure PDF.js worker
 if (typeof window !== 'undefined' && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
-  // Set the PDF.js worker source to the local file in public directory with version
-  const workerVersion = '5.2.133'; // Match this with your pdfjs-dist version
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `/pdfjskit/pdfjs/build/pdf.worker.mjs?v=${workerVersion}`;
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 }
 
 // Configure PDF.js options for small PDFs
