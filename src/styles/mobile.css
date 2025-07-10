@@ -18,6 +18,8 @@
   body {
     margin: 0;
     padding: 0;
+    background-color: var(--primary-bg);
+    color: var(--text-primary);
   }
 
   /* Main container styles */
@@ -50,11 +52,18 @@
   .app-container select {
     padding: 10px;
     font-size: var(--mobile-font-size);
-    border: 1px solid #ccc;
+    border: 1px solid var(--input-border);
     border-radius: 4px;
     width: 100%;
     margin-bottom: var(--mobile-spacing);
     min-height: 44px; /* Minimum touch target size */
+    background-color: var(--primary-bg);
+    color: var(--text-primary);
+  }
+
+  .app-container input:focus, .app-container select:focus {
+    border-color: var(--input-focus);
+    box-shadow: 0 0 0 2px var(--focus-ring);
   }
 
   /* Buttons */
@@ -67,6 +76,17 @@
     width: 100%;
     margin-bottom: 8px;
     min-height: 44px; /* Minimum touch target size */
+    background-color: var(--secondary-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--table-border);
+  }
+
+  .app-container button:hover {
+    background-color: var(--table-row-hover);
+  }
+
+  .app-container button:focus {
+    outline: 2px solid var(--focus-ring);
   }
 
   /* Tables */
@@ -163,4 +183,22 @@
     flex-direction: column;
     gap: 8px;
   }
+}
+
+/* Status colors */
+.success {
+  color: var(--success);
+}
+
+.error {
+  color: var(--error);
+}
+
+/* Links */
+a {
+  color: var(--focus-ring);
+}
+
+a:hover {
+  color: var(--input-focus);
 } 

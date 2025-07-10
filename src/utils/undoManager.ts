@@ -54,49 +54,62 @@ export class UndoManager {
   }
 
   private hasSignificantChange(oldState: StateSnapshot, newState: StateSnapshot): boolean {
-    // Check if any crew member's name or classification has changed
+    // Check if the number of crew members has changed
+    if (oldState.data.length !== newState.data.length) {
+      return true;
+    }
+
+    // Check if any crew member's data has changed
     const hasCrewChange = oldState.data.some((oldMember, index) => {
       const newMember = newState.data[index];
-      return (
-        !newMember ||
-        oldMember.name !== newMember.name ||
-        oldMember.classification !== newMember.classification
-      );
+      if (!newMember) return true;
+
+      // Check name and classification changes
+      if (oldMember.name !== newMember.name || oldMember.classification !== newMember.classification) {
+        return true;
+      }
+
+      // Check day changes
+      if (oldMember.days.length !== newMember.days.length) {
+        return true;
+      }
+
+      return oldMember.days.some((oldDay, dayIndex) => {
+        const newDay = newMember.days[dayIndex];
+        if (!newDay) return true;
+        return oldDay.on !== newDay.on || oldDay.off !== newDay.off || oldDay.date !== newDay.date;
+      });
     });
 
     if (hasCrewChange) return true;
 
     // Check if crew info has changed
-    if (JSON.stringify(oldState.crewInfo) !== JSON.stringify(newState.crewInfo)) {
+    if (
+      oldState.crewInfo.crewName !== newState.crewInfo.crewName ||
+      oldState.crewInfo.crewNumber !== newState.crewInfo.crewNumber ||
+      oldState.crewInfo.fireName !== newState.crewInfo.fireName ||
+      oldState.crewInfo.fireNumber !== newState.crewInfo.fireNumber
+    ) {
       return true;
     }
 
     // Check if checkbox states have changed
-    if (JSON.stringify(oldState.checkboxStates) !== JSON.stringify(newState.checkboxStates)) {
-      return true;
-    }
+    const hasCheckboxChange = Object.keys(oldState.checkboxStates).some(
+      key => oldState.checkboxStates[key as keyof typeof oldState.checkboxStates] !== 
+             newState.checkboxStates[key as keyof typeof oldState.checkboxStates]
+    );
+    if (hasCheckboxChange) return true;
 
     // Check if custom entries have changed
-    if (JSON.stringify(oldState.customEntries) !== JSON.stringify(newState.customEntries)) {
+    if (oldState.customEntries.length !== newState.customEntries.length) {
       return true;
     }
+    const hasCustomEntriesChange = oldState.customEntries.some(
+      (entry, index) => entry !== newState.customEntries[index]
+    );
+    if (hasCustomEntriesChange) return true;
 
-    // Check if any day's on/off times have changed
-    const hasTimeChange = oldState.data.some((oldMember, memberIndex) => {
-      const newMember = newState.data[memberIndex];
-      if (!newMember) return true;
-
-      return oldMember.days.some((oldDay, dayIndex) => {
-        const newDay = newMember.days[dayIndex];
-        return (
-          !newDay ||
-          oldDay.on !== newDay.on ||
-          oldDay.off !== newDay.off
-        );
-      });
-    });
-
-    return hasTimeChange;
+    return false;
   }
 
   public recordChange(newState: StateSnapshot) {

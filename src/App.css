@@ -1,5 +1,22 @@
-.app {
+.App {
+  text-align: center;
   min-height: 100vh;
-  padding: 20px;
-  background-color: #f0f0f0;
+  background-color: var(--primary-bg);
+  color: var(--text-primary);
+}
+
+/* Add a header section for controls */
+.app-header {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 1rem;
+  background-color: var(--secondary-bg);
+  border-bottom: 1px solid var(--table-border);
+}
+
+/* Container for the main content */
+.app-content {
+  padding: 1rem;
+  background-color: var(--primary-bg);
 } 

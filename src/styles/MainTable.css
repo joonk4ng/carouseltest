@@ -573,75 +573,50 @@
 
 /* Undo button */
 .ctr-btn.undo-btn {
-  width: 100%;
-  padding: 12px 16px;
-  background-color: var(--danger-color);
+  background-color: #4CAF50;
   color: white;
-  font-size: 1rem;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s ease;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border-radius: 4px;
-  transition: all 0.2s ease;
-  margin-top: 4px;
-}
-
-.ctr-btn.undo-btn:hover:not(:disabled) {
-  background-color: var(--danger-hover);
-  transform: translateY(-1px);
+  min-width: 100px;
+  opacity: 1;
 }
 
 .ctr-btn.undo-btn:disabled {
-  opacity: 0.6;
+  background-color: #cccccc;
   cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.ctr-btn.undo-btn:not(:disabled):hover {
+  background-color: #45a049;
+  transform: translateY(-1px);
+}
+
+.ctr-btn.undo-btn span {
+  font-size: 16px;
 }
 
 .ctr-btn.undo-btn .undo-text {
+  font-size: 14px;
   font-weight: 500;
 }
 
 /* Mobile styles */
 @media (max-width: 768px) {
-  .ctr-sticky-header {
-    padding: 8px 12px;
-  }
-
-  .ctr-header-stack {
-    gap: 8px;
-  }
-
-  .ctr-date-selector {
-    gap: 8px;
-  }
-
-  .ctr-btn.calendar-btn.primary {
-    padding: 8px;
-    font-size: 0.85rem;
-    min-width: auto;
-  }
-
-  .ctr-current-date {
-    padding: 8px;
-    font-size: 0.85rem;
-  }
-
   .ctr-btn.undo-btn {
-    padding: 10px;
-    font-size: 0.9rem;
-    margin-top: 2px;
+    min-width: 80px;
+    padding: 6px 12px;
   }
-
-  /* Hide text on very small screens */
-  @media (max-width: 360px) {
-    .ctr-btn.undo-btn .undo-text {
-      display: none;
-    }
-    
-    .ctr-btn.undo-btn {
-      padding: 10px;
-      aspect-ratio: 1;
-    }
+  
+  .ctr-btn.undo-btn .undo-text {
+    font-size: 12px;
   }
 }
 

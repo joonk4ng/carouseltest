@@ -1158,3 +1158,55 @@ html, body {
     }
   }
 } 
+
+.main-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+  background-color: var(--primary-bg);
+}
+
+.main-table th,
+.main-table td {
+  padding: 0.75rem;
+  border: 1px solid var(--table-border);
+  color: var(--text-primary);
+}
+
+.main-table th {
+  background-color: var(--table-header-bg);
+  font-weight: 600;
+}
+
+.main-table tr:hover {
+  background-color: var(--table-row-hover);
+}
+
+.main-table input,
+.main-table select {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--input-border);
+  border-radius: 4px;
+  background-color: var(--primary-bg);
+  color: var(--text-primary);
+}
+
+.main-table input:focus,
+.main-table select:focus {
+  outline: none;
+  border-color: var(--input-focus);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+/* Mobile-specific adjustments */
+@media (max-width: 767px) {
+  .main-table {
+    font-size: 0.9rem;
+  }
+
+  .main-table th,
+  .main-table td {
+    padding: 0.5rem;
+  }
+} 

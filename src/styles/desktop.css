@@ -1,9 +1,50 @@
 /* Desktop-specific styles */
-:root {
-  --desktop-container-width: 1200px;
-  --desktop-padding: 40px;
-  --desktop-font-size: 16px;
-  --desktop-spacing: 24px;
+body {
+  background-color: var(--primary-bg);
+  color: var(--text-primary);
+}
+
+input, select, textarea {
+  background-color: var(--primary-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--input-border);
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--input-focus);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+button {
+  background-color: var(--secondary-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--table-border);
+}
+
+button:hover {
+  background-color: var(--table-row-hover);
+}
+
+button:focus {
+  outline: 2px solid var(--focus-ring);
+}
+
+/* Status colors */
+.success {
+  color: var(--success);
+}
+
+.error {
+  color: var(--error);
+}
+
+/* Links */
+a {
+  color: var(--focus-ring);
+}
+
+a:hover {
+  color: var(--input-focus);
 }
 
 /* Main container styles */

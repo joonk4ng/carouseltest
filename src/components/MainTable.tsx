@@ -8,7 +8,7 @@ import { stableCTRService } from '../db/stableDexieService';
 import { saveCoordinator } from '../utils/saveCoordinator';
 import { Notification } from './Notification';
 import { mapExcelToData } from '../utils/excelMapping';
-import { CrewMember, CrewInfo, Day, CellChange, LastEdit } from '../types/CTRTypes';
+import { CrewMember, CrewInfo, Day, CellChange } from '../types/CTRTypes';
 import { calculateTotalHours } from '../utils/timeCalculations';
 import { DateCalendar } from './DateCalendar';
 import PDFGenerationViewer from './PDFGenerationViewer';
@@ -24,7 +24,7 @@ import { AutoSaveStatus } from './AutoSaveStatus';
 import '../styles/AutoSaveStatus.css';
 import { propagateChangesForward } from '../utils/changePropagate';
 import { PropagationIndicator } from './PropagationIndicator';
-import { useUndo } from '../hooks/useUndo';
+import { ThemeToggle } from './ThemeToggle';
 
 
 // TypeScript interfaces
@@ -32,6 +32,13 @@ interface EditingCell {
   row: number;
   field: string;
   dayIdx?: number;
+}
+
+interface UndoState {
+  rowIndex: number;
+  field: string;
+  dayIndex?: number;
+  savedValue: string;
 }
 
 interface NotificationState {
@@ -179,35 +186,20 @@ export default function MainTable() {
   const [isPropagating, setIsPropagating] = useState(false);
   const [propagationMessage, setPropagationMessage] = useState('');
 
-  // Initialize undo system
-  const { recordState, undo, canUndo, clearHistory } = useUndo(
-    {
-      data,
-      crewInfo,
-      checkboxStates,
-      customEntries
-    },
-    {
-      onStateChange: (state) => {
-        setData(state.data);
-        setCrewInfo(state.crewInfo);
-        setCheckboxStates(state.checkboxStates);
-        setCustomEntries(state.customEntries);
-        setHasUnsavedChanges(true);
-      }
-    }
-  );
+  // Remove useUndo initialization and replace with simple undo state
+  const [undoState, setUndoState] = useState<UndoState | null>(null);
+  const [canUndo, setCanUndo] = useState(false);
 
   // Clear undo history when changing dates
   useEffect(() => {
-    clearHistory();
-  }, [selectedDate, clearHistory]);
+    // clearHistory(); // This line is removed as per the edit hint
+  }, [selectedDate]); // Removed clearHistory from dependency array
 
   // Remove the automatic state recording effect since we'll record manually on significant changes
 
   // Add state for undo functionality
-  const [lastEdit, setLastEdit] = useState<LastEdit | null>(null);
-  const [canUndoLastEdit, setCanUndoLastEdit] = useState(false);
+  // const [lastEdit, setLastEdit] = useState<LastEdit | null>(null); // This line is removed as per the edit hint
+  // const [canUndoLastEdit, setCanUndoLastEdit] = useState(false); // This line is removed as per the edit hint
 
   const handleCellClick = (rowIdx: number, field: string, dayIdx?: number) => {
     // Store the original value when clicking into a cell
@@ -223,24 +215,31 @@ export default function MainTable() {
       originalValue = typeof fieldValue === 'string' ? fieldValue : '';
     }
 
-    setLastEdit({
-      rowIndex: rowIdx,
-      field,
-      dayIndex: dayIdx,
-      originalValue
-    });
-    setCanUndoLastEdit(false);
+    // setLastEdit({ // This line is removed as per the edit hint
+    //   rowIndex: rowIdx, // This line is removed as per the edit hint
+    //   field, // This line is removed as per the edit hint
+    //   dayIndex: dayIdx, // This line is removed as per the edit hint
+    //   originalValue // This line is removed as per the edit hint
+    // }); // This line is removed as per the edit hint
+    // setCanUndoLastEdit(false); // This line is removed as per the edit hint
   };
 
   const handleCellEdit = async (e: React.ChangeEvent<HTMLInputElement>, rowIdx: number, field: string, dayIdx?: number) => {
-    const { value } = e.target;
+    const newValue = e.target.value;
+    console.log('handleCellEdit: Starting edit', {
+      rowIdx,
+      field,
+      dayIdx,
+      newValue
+    });
     
     // Validate military time for on/off fields
     if ((field === 'on' || field === 'off')) {
-      if (!/^\d*$/.test(value)) return;
-      if (!validateMilitaryTime(value)) return;
+      if (!/^\d*$/.test(newValue)) return;
+      if (!validateMilitaryTime(newValue)) return;
     }
 
+    // Create a copy of the current data
     const newData = [...data];
     
     // Ensure the row exists and has the required structure
@@ -256,13 +255,14 @@ export default function MainTable() {
     if (!newData[rowIdx].days) {
       newData[rowIdx].days = days.map(date => ({ date, on: '', off: '' }));
     }
-    
+
+    // Update the data based on field type
     if (dayIdx !== undefined) {
       // Handle time entry fields
       if (!newData[rowIdx].days[dayIdx]) {
         newData[rowIdx].days[dayIdx] = { date: days[dayIdx] || '', on: '', off: '' };
       }
-      newData[rowIdx].days[dayIdx][field as keyof Day] = value;
+      newData[rowIdx].days[dayIdx][field as keyof Day] = newValue;
 
       // Copy times for second row
       if (rowIdx === 1) {
@@ -271,167 +271,268 @@ export default function MainTable() {
             if (!newData[i].days[dayIdx]) {
               newData[i].days[dayIdx] = { date: days[dayIdx] || '', on: '', off: '' };
             }
-            newData[i].days[dayIdx][field as keyof Day] = value;
+            newData[i].days[dayIdx][field as keyof Day] = newValue;
           }
         }
       }
     } else {
-      // Handle name/classification fields
+      // Handle name and classification changes
       if (field === 'name' || field === 'classification') {
-        newData[rowIdx][field] = value;
+        (newData[rowIdx] as any)[field] = newValue;
 
-        if (field === 'name' && value) {
+        // Handle FFT time copying
+        if (field === 'name' && newValue) {
           const fftIndex = newData.findIndex(member => 
             member?.classification?.toUpperCase().includes('FFT1') || 
             member?.classification?.toUpperCase().includes('FFT2')
           );
 
           if (fftIndex !== -1 && rowIdx > fftIndex && newData[fftIndex]?.days) {
-            const fftTimes = newData[fftIndex].days;
-            newData[rowIdx].days = fftTimes.map(day => ({ ...day }));
+            // Create a deep copy of the FFT times
+            const fftTimes: Day[] = newData[fftIndex].days.map(day => ({
+              date: day.date,
+              on: day.on,
+              off: day.off
+            }));
+            newData[rowIdx].days = fftTimes;
           }
         }
       }
     }
-    
+
+    // Update the data state
     setData(newData);
     setHasUnsavedChanges(true);
+
+    // Propagate changes if needed
+    if (isPropagating) {
+      try {
+        const changes: CellChange[] = [{
+          field,
+          oldValue: field === 'days' ? JSON.stringify(data[rowIdx].days) : (data[rowIdx][field as keyof CrewMember] || ''),
+          newValue: field === 'days' ? JSON.stringify(newData[rowIdx].days) : newValue
+        }];
+        await propagateChangesForward(changes, selectedDate || '');
+      } catch (error) {
+        console.error('Error propagating changes:', error);
+        showNotification('Failed to propagate changes forward', 'error');
+      }
+    }
   };
 
   const handleCellBlur = async (field: string, newValue: string, rowIndex: number, dayIndex?: number) => {
-    if (!selectedDate || !data) return;
-
-    // Check if this cell matches our last edit and if the value changed
-    if (lastEdit && 
-        lastEdit.rowIndex === rowIndex && 
-        lastEdit.field === field && 
-        lastEdit.dayIndex === dayIndex && 
-        lastEdit.originalValue !== newValue) {
-      setCanUndoLastEdit(true);
-    } else {
-      setCanUndoLastEdit(false);
-      setLastEdit(null);
+    if (!selectedDate || !data) {
+      console.log('handleCellBlur: No selectedDate or data', { selectedDate, data });
+      return;
     }
 
-    // Get the old value
-    let oldValue = '';
-    if (dayIndex !== undefined) {
-      const timeValue = data[rowIndex]?.days[dayIndex]?.[field as keyof Day];
-      oldValue = typeof timeValue === 'string' ? timeValue : '';
-    } else {
-      const fieldValue = data[rowIndex]?.[field as keyof CrewMember];
-      oldValue = typeof fieldValue === 'string' ? fieldValue : '';
-    }
-    
-    // Only process if there's actually a change
-    if (oldValue !== newValue) {
-      const change: CellChange = {
-        field,
-        oldValue: oldValue.toString(),
-        newValue
-      };
-
-      // Save the current change
-      await saveCoordinator.saveRecord({
-        dateRange: selectedDate,
-        data,
-        crewInfo: {
-          ...crewInfo,
-          [field]: newValue
-        },
-        onProgress: (message) => {
-          console.log('Save progress:', message);
-        },
-        onComplete: () => {
-          setHasUnsavedChanges(false);
-          setLastSaved(Date.now());
-          console.log('Save completed:', { dateRange: selectedDate });
-        },
-        onError: (error) => {
-          console.error('Save error:', error);
-          showNotification('Failed to save changes. Please try again.', 'error');
-        }
-      });
-
-      // Show propagation indicator
-      setIsPropagating(true);
-      setPropagationMessage(`Updating future schedules...`);
-
-      try {
-        await propagateChangesForward([change], selectedDate);
-        setPropagationMessage('Future schedules updated');
-        setTimeout(() => {
-          setIsPropagating(false);
-        }, 2000);
-      } catch (error) {
-        console.error('Error propagating changes:', error);
-        setPropagationMessage('Failed to update future schedules');
-        setTimeout(() => {
-          setIsPropagating(false);
-        }, 3000);
+    try {
+      // Get the saved state from IndexedDB
+      const savedRecord = await stableCTRService.getRecord(selectedDate);
+      if (!savedRecord) {
+        console.log('handleCellBlur: No saved record found for date', { selectedDate });
+        return;
       }
+
+      // Get the saved value
+      let savedValue = '';
+      if (dayIndex !== undefined) {
+        const timeValue = savedRecord.data[rowIndex]?.days[dayIndex]?.[field as keyof Day];
+        savedValue = typeof timeValue === 'string' ? timeValue : '';
+        console.log('handleCellBlur: Got saved time value', { 
+          rowIndex, 
+          dayIndex, 
+          field, 
+          timeValue, 
+          savedValue,
+          newValue 
+        });
+      } else {
+        const fieldValue = savedRecord.data[rowIndex]?.[field as keyof CrewMember];
+        savedValue = typeof fieldValue === 'string' ? fieldValue : '';
+        console.log('handleCellBlur: Got saved field value', { 
+          rowIndex, 
+          field, 
+          fieldValue, 
+          savedValue,
+          newValue 
+        });
+      }
+
+      // If there's a difference between saved and new value
+      if (savedValue !== newValue) {
+        console.log('handleCellBlur: Value changed, enabling undo', {
+          savedValue,
+          newValue,
+          rowIndex,
+          field,
+          dayIndex
+        });
+        
+        // Enable undo with saved value
+        setUndoState({
+          rowIndex,
+          field,
+          dayIndex,
+          savedValue
+        });
+        setCanUndo(true);
+
+        // Save the current change
+        await saveCoordinator.saveRecord({
+          dateRange: selectedDate,
+          data,
+          crewInfo: {
+            ...crewInfo,
+            checkboxStates,
+            customEntries
+          },
+          onProgress: (message) => {
+            console.log('Save progress:', message);
+          },
+          onComplete: () => {
+            setHasUnsavedChanges(false);
+            setLastSaved(Date.now());
+            console.log('Save completed:', { 
+              dateRange: selectedDate,
+              canUndo: true,
+              undoState: {
+                rowIndex,
+                field,
+                dayIndex,
+                savedValue
+              }
+            });
+          },
+          onError: (error) => {
+            console.error('Save error:', error);
+            showNotification('Failed to save changes. Please try again.', 'error');
+          }
+        });
+
+        // Handle propagation if needed
+        if (isPropagating) {
+          setIsPropagating(true);
+          setPropagationMessage(`Updating future schedules...`);
+
+          try {
+            const change: CellChange = {
+              field,
+              oldValue: savedValue,
+              newValue
+            };
+            
+            await propagateChangesForward([change], selectedDate);
+            setPropagationMessage('Future schedules updated');
+            setTimeout(() => {
+              setIsPropagating(false);
+            }, 2000);
+          } catch (error) {
+            console.error('Error propagating changes:', error);
+            setPropagationMessage('Failed to update future schedules');
+            setTimeout(() => {
+              setIsPropagating(false);
+            }, 3000);
+          }
+        }
+      } else {
+        console.log('handleCellBlur: No value change, resetting undo state', {
+          savedValue,
+          newValue
+        });
+        // No changes, reset undo state
+        setUndoState(null);
+        setCanUndo(false);
+      }
+    } catch (error) {
+      console.error('Error in handleCellBlur:', error);
+      showNotification('Error processing change', 'error');
     }
   };
 
   const handleUndo = async () => {
-    if (!lastEdit || !canUndoLastEdit) return;
+    console.log('handleUndo: Starting undo operation', {
+      undoState,
+      canUndo
+    });
+
+    if (!undoState || !canUndo) {
+      console.log('handleUndo: Cannot undo - no state or not enabled', {
+        undoState,
+        canUndo
+      });
+      return;
+    }
 
     const newData = [...data];
     
-    if (lastEdit.dayIndex !== undefined) {
+    if (undoState.dayIndex !== undefined) {
       // Undo time entry field
-      if (!newData[lastEdit.rowIndex]?.days[lastEdit.dayIndex]) {
+      if (!newData[undoState.rowIndex]?.days[undoState.dayIndex]) {
         // Initialize days array if it doesn't exist
-        if (!newData[lastEdit.rowIndex].days) {
-          newData[lastEdit.rowIndex].days = days.map(date => ({ date, on: '', off: '' }));
+        if (!newData[undoState.rowIndex].days) {
+          newData[undoState.rowIndex].days = days.map(date => ({ date, on: '', off: '' }));
         }
         // Initialize specific day if it doesn't exist
-        newData[lastEdit.rowIndex].days[lastEdit.dayIndex] = { 
-          date: days[lastEdit.dayIndex] || '', 
+        newData[undoState.rowIndex].days[undoState.dayIndex] = { 
+          date: days[undoState.dayIndex] || '', 
           on: '', 
           off: '' 
         };
       }
-      newData[lastEdit.rowIndex].days[lastEdit.dayIndex][lastEdit.field as keyof Day] = lastEdit.originalValue;
+      console.log('handleUndo: Undoing time entry', {
+        rowIndex: undoState.rowIndex,
+        dayIndex: undoState.dayIndex,
+        field: undoState.field,
+        savedValue: undoState.savedValue
+      });
+      newData[undoState.rowIndex].days[undoState.dayIndex][undoState.field as keyof Day] = undoState.savedValue;
     } else {
       // Undo name/classification field
-      if (!newData[lastEdit.rowIndex]) {
-        newData[lastEdit.rowIndex] = {
+      if (!newData[undoState.rowIndex]) {
+        newData[undoState.rowIndex] = {
           name: '',
           classification: '',
           days: days.map(date => ({ date, on: '', off: '' }))
         };
       }
       // Only update if it's a string field (name or classification)
-      if (lastEdit.field === 'name' || lastEdit.field === 'classification') {
-        newData[lastEdit.rowIndex][lastEdit.field] = lastEdit.originalValue;
+      if (undoState.field === 'name' || undoState.field === 'classification') {
+        console.log('handleUndo: Undoing field value', {
+          rowIndex: undoState.rowIndex,
+          field: undoState.field,
+          savedValue: undoState.savedValue
+        });
+        newData[undoState.rowIndex][undoState.field] = undoState.savedValue;
       }
     }
 
+    // Update the data state
     setData(newData);
     setHasUnsavedChanges(true);
 
     // Trigger save with the original value
     await handleCellBlur(
-      lastEdit.field,
-      lastEdit.originalValue,
-      lastEdit.rowIndex,
-      lastEdit.dayIndex
+      undoState.field,
+      undoState.savedValue,
+      undoState.rowIndex,
+      undoState.dayIndex
     );
 
     // Reset undo state
-    setCanUndoLastEdit(false);
-    setLastEdit(null);
+    console.log('handleUndo: Resetting undo state');
+    setCanUndo(false);
+    setUndoState(null);
   };
 
   const handleCheckboxChange = async (option: keyof typeof checkboxStates) => {
     // Record state before making the change
-    recordState({
-      data,
-      crewInfo,
-      checkboxStates,
-      customEntries
-    });
+    // recordState({ // This line is removed as per the edit hint
+    //   data, // This line is removed as per the edit hint
+    //   crewInfo, // This line is removed as per the edit hint
+    //   checkboxStates, // This line is removed as per the edit hint
+    //   customEntries // This line is removed as per the edit hint
+    // }); // This line is removed as per the edit hint
 
     setCheckboxStates(prev => {
       const newStates = { ...prev };
@@ -871,7 +972,9 @@ export default function MainTable() {
     try {
       const [date1, date2] = dateRange.split(' to ');
       const record = await stableCTRService.getRecord(dateRange);
+      
       if (record) {
+        // Load existing record
         setData(record.data);
         
         // Extract crew info fields first
@@ -904,10 +1007,48 @@ export default function MainTable() {
         
         // Set the PDF ID from the mapping, or null if no PDF exists for this date range
         setPdfId(pdfsByDateRange[dateRange] || null);
+      } else {
+        // Save current data with new date range
+        const newData = data.map(member => ({
+          ...member,
+          days: member.days.map((day, idx) => ({
+            ...day,
+            date: idx === 0 ? date1 : date2
+          }))
+        }));
+        
+        setData(newData);
+        setDays([date1, date2]);
+        setSelectedDate(dateRange);
+        setHasUnsavedChanges(true);
+        
+        // Save the new record
+        await saveCoordinator.saveRecord({
+          dateRange,
+          data: newData,
+          crewInfo: {
+            ...crewInfo,
+            checkboxStates,
+            customEntries
+          },
+          onProgress: (message) => {
+            console.log('Save progress:', message);
+          },
+          onComplete: () => {
+            setHasUnsavedChanges(false);
+            setLastSaved(Date.now());
+            showNotification('Changes saved successfully', 'success');
+            console.log('Save completed:', { dateRange });
+          },
+          onError: (error) => {
+            console.error('Save error:', error);
+            showNotification('Failed to save changes. Please try again.', 'error');
+          }
+        });
       }
     } catch (error) {
-      console.error('Error loading record:', error);
-      showNotification('Failed to load record', 'error');
+      console.error('Error loading/saving record:', error);
+      showNotification('Failed to load/save record', 'error');
     }
   };
 
@@ -974,12 +1115,12 @@ export default function MainTable() {
 
   const handleCrewInfoBlur = async () => {
     // Record state before saving
-    recordState({
-      data,
-      crewInfo,
-      checkboxStates,
-      customEntries
-    });
+    // recordState({ // This line is removed as per the edit hint
+    //   data, // This line is removed as per the edit hint
+    //   crewInfo, // This line is removed as per the edit hint
+    //   checkboxStates, // This line is removed as per the edit hint
+    //   customEntries // This line is removed as per the edit hint
+    // }); // This line is removed as per the edit hint
 
     try {
       setIsSaving(true);
@@ -1256,6 +1397,11 @@ export default function MainTable() {
     }
   };
 
+  // Debug logging for undo button state
+  useEffect(() => {
+    console.log('Undo button state:', { canUndo, isSaving, undoState });
+  }, [canUndo, isSaving, undoState]);
+
   return (
     <div className="ctr-container">
       <div className="ctr-sticky-header">
@@ -1281,8 +1427,8 @@ export default function MainTable() {
           <button
             className="ctr-btn undo-btn"
             onClick={handleUndo}
-            disabled={!canUndoLastEdit || isSaving}
-            title="Undo last change"
+            disabled={!canUndo || isSaving}
+            title={canUndo ? "Undo last change" : "No changes to undo"}
           >
             <span>↩</span> <span className="undo-text">Undo</span>
           </button>
@@ -1312,6 +1458,9 @@ export default function MainTable() {
           >
             Copy to Next 20 Days
           </button>
+        </div>
+        <div className="ctr-theme-toggle">
+          <ThemeToggle />
         </div>
       </div>
 

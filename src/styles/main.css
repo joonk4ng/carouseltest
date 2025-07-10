@@ -1,11 +1,5 @@
-/* Base styles that apply to all viewports */
-:root {
-  --primary-color: #b71c1c;
-  --secondary-color: #1976d2;
-  --background-color: #f5f5f5;
-  --text-color: #333;
-  --border-color: #ddd;
-}
+/* Import theme first */
+@import './theme.css';
 
 /* Import mobile styles by default */
 @import './mobile.css';
@@ -23,8 +17,8 @@ body {
     Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: var(--background-color);
-  color: var(--text-color);
+  background-color: var(--primary-bg);
+  color: var(--text-primary);
 }
 
 /* Common utility classes */

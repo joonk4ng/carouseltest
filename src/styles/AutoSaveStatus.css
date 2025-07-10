@@ -1,10 +1,96 @@
 .auto-save-status {
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
-  border-radius: 8px;
-  padding: 12px;
-  margin: 8px 0;
-  font-size: 14px;
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  border-radius: 20px;
+  background-color: var(--secondary-bg);
+  border: 1px solid var(--table-border);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: opacity 0.3s ease;
+  opacity: 0.8;
+}
+
+.auto-save-status:hover {
+  opacity: 1;
+}
+
+.auto-save-status-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.auto-save-status.saving {
+  color: var(--text-secondary);
+}
+
+.auto-save-status.saved {
+  color: var(--success);
+}
+
+.auto-save-status.error {
+  color: var(--error);
+}
+
+.auto-save-status-text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.auto-save-status-text::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: currentColor;
+}
+
+.auto-save-status-time {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+/* Animation for the saving indicator */
+@keyframes pulse {
+  0% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.6;
+  }
+}
+
+.auto-save-status.saving .auto-save-status-text::before {
+  animation: pulse 1.5s infinite;
+}
+
+.auto-save-icon {
+  width: 16px;
+  height: 16px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .status-bar {
@@ -47,15 +133,6 @@
   background: #f8d7da;
   color: #721c24;
   border: 1px solid #f5c6cb;
-}
-
-.spinner {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
 }
 
 .history-btn {
