@@ -351,7 +351,7 @@ const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days })
 
   return (
     <button onClick={handlePrint} className="ctr-btn print-btn">
-      Print Table
+      Send to Printer
     </button>
   );
 };

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --force",
     "dev:clean": "rimraf node_modules/.vite && vite --force",
-    "build": "npm run generate-icons && vite build",
+    "build": "vite build",
     "preview": "rimraf node_modules/.vite && vite preview --host 0.0.0.0 --port 4173",
     "start": "vite preview --host 0.0.0.0 --port 4173",
     "generate-icons": "node scripts/generate-icons.js",

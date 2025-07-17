@@ -47,4 +47,6 @@ export interface LastEdit {
   field: string;
   dayIndex?: number;  // For time entries
   originalValue: string;
-} 
+}
+
+// Legacy types removed - now using simple propagation system 

@@ -1389,4 +1389,141 @@
     font-size: 16px;
     height: 44px;
   }
+}
+
+/* PDF Mini Viewport Styles */
+.pdf-mini-viewport {
+  margin-top: 20px;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 16px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.pdf-mini-viewport:hover {
+  border-color: #d32f2f;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.pdf-mini-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.pdf-mini-header h4 {
+  margin: 0;
+  color: #333;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.pdf-mini-edit-btn {
+  background: #1976d2;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pdf-mini-edit-btn:hover {
+  background: #1565c0;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.pdf-mini-container {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f8f9fa;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.pdf-mini-container:hover {
+  transform: scale(1.02);
+}
+
+.pdf-mini-preview {
+  border-radius: 8px;
+}
+
+/* PDF Viewer in mini viewport */
+.pdf-mini-preview {
+  border: none;
+  background: transparent;
+  height: 100% !important;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pdf-mini-preview canvas {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* PDF Mini Loading Indicator */
+.pdf-mini-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: #666;
+  font-size: 14px;
+  z-index: 10;
+}
+
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #d32f2f;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Mobile responsiveness for PDF mini viewport */
+@media (max-width: 768px) {
+  .pdf-mini-viewport {
+    margin-top: 16px;
+    padding: 12px;
+  }
+
+  .pdf-mini-header h4 {
+    font-size: 1rem;
+  }
+
+  .pdf-mini-edit-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .pdf-mini-container {
+    height: 150px;
+  }
 } 

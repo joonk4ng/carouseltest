@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { defaultData } from '../data/defaultData';
+
 import '../styles/MainTable.css';
 import { fillCTRPDF } from '../utils/fillCTRPDF';
 import { fillExcelTemplate } from '../utils/fillExcelTemplate';
@@ -11,8 +11,10 @@ import { mapExcelToData } from '../utils/excelMapping';
 import { CrewMember, CrewInfo, Day, CellChange } from '../types/CTRTypes';
 import { calculateTotalHours } from '../utils/timeCalculations';
 import { DateCalendar } from './DateCalendar';
-import PDFGenerationViewer from './PDFGenerationViewer';
+
 import EnhancedPDFViewer from './EnhancedPDFViewer';
+import PDFPreviewViewer from './PDFPreviewViewer';
+import PDFViewer from './PDFViewer';
 import { storePDF, listPDFs } from '../utils/pdfStorage';
 import ExcelJS from 'exceljs';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
@@ -22,9 +24,8 @@ import PrintableTable from './PrintableTable';
 import '../styles/components/PrintableTable.css';
 import { AutoSaveStatus } from './AutoSaveStatus';
 import '../styles/AutoSaveStatus.css';
-import { propagateChangesForward } from '../utils/changePropagate';
-import { PropagationIndicator } from './PropagationIndicator';
 import { ThemeToggle } from './ThemeToggle';
+
 
 
 // TypeScript interfaces
@@ -69,7 +70,7 @@ function saveData(data: CrewMember[]) {
 
 function loadData(): CrewMember[] {
   // No longer needed since we're using IndexedDB
-  return defaultData;
+  return [];
 }
 
 // Add deep comparison utility
@@ -95,7 +96,7 @@ function deepEqual(obj1: any, obj2: any): boolean {
 const isTouchDevice = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
 export default function MainTable() {
-  const [data, setData] = useState<CrewMember[]>(defaultData);
+  const [data, setData] = useState<CrewMember[]>([]);
   
   const [dayCount, setDayCount] = useState(2);
   
@@ -166,9 +167,15 @@ export default function MainTable() {
 
   // Add state for tracking if we're in signing mode
   const [isSigningMode, setIsSigningMode] = useState(false);
+  
+  // Add state to track if a PDF has been signed for this date range
+  const [hasSignedPDF, setHasSignedPDF] = useState(false);
+  
+  // Add state to track PDF generation count for the current date range
+  const [pdfGenerationCount, setPdfGenerationCount] = useState(0);
 
   // Add state for collapsible section
-  const [isCollapsed, setIsCollapsed] = useState(false);
+
   const [checkboxStates, setCheckboxStates] = useState({
     noMealsLodging: false,
     noMeals: false,
@@ -182,9 +189,11 @@ export default function MainTable() {
   // Add state for save status
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<number | null>(null);
+  
+  // Add state for navigation debouncing
+  const [isNavigating, setIsNavigating] = useState(false);
 
-  const [isPropagating, setIsPropagating] = useState(false);
-  const [propagationMessage, setPropagationMessage] = useState('');
+  // Legacy propagation state variables removed - now using simple propagation
 
   // Remove useUndo initialization and replace with simple undo state
   const [undoState, setUndoState] = useState<UndoState | null>(null);
@@ -226,11 +235,13 @@ export default function MainTable() {
 
   const handleCellEdit = async (e: React.ChangeEvent<HTMLInputElement>, rowIdx: number, field: string, dayIdx?: number) => {
     const newValue = e.target.value;
-    console.log('handleCellEdit: Starting edit', {
+    console.log('🔄 MainTable: handleCellEdit called', {
       rowIdx,
       field,
       dayIdx,
-      newValue
+      newValue,
+      selectedDate,
+      isSelectedDateSet: !!selectedDate
     });
     
     // Validate military time for on/off fields
@@ -304,18 +315,37 @@ export default function MainTable() {
     setData(newData);
     setHasUnsavedChanges(true);
 
-    // Propagate changes if needed
-    if (isPropagating) {
+    // Queue changes for propagation instead of immediate propagation
+    console.log('🔄 MainTable: Checking queueing conditions', {
+      selectedDate,
+      hasSelectedDate: !!selectedDate,
+      selectedDateType: typeof selectedDate
+    });
+    
+    if (selectedDate) {
       try {
-        const changes: CellChange[] = [{
+        const oldValue = dayIdx !== undefined 
+          ? (data[rowIdx]?.days?.[dayIdx]?.[field as keyof Day] || '')
+          : (data[rowIdx]?.[field as keyof CrewMember] || '');
+        
+        const changeType = dayIdx !== undefined 
+          ? 'time' as const
+          : (field === 'name' ? 'name' as const : 'classification' as const);
+
+        console.log('🔄 MainTable: Queueing change from cell edit', {
+          rowIdx,
           field,
-          oldValue: field === 'days' ? JSON.stringify(data[rowIdx].days) : (data[rowIdx][field as keyof CrewMember] || ''),
-          newValue: field === 'days' ? JSON.stringify(newData[rowIdx].days) : newValue
-        }];
-        await propagateChangesForward(changes, selectedDate || '');
+          dayIdx,
+          oldValue,
+          newValue,
+          changeType,
+          selectedDate
+        });
+
+
       } catch (error) {
-        console.error('Error propagating changes:', error);
-        showNotification('Failed to propagate changes forward', 'error');
+        console.error('🔄 MainTable: Error queueing change:', error);
+        showNotification('Failed to queue change for propagation', 'error');
       }
     }
   };
@@ -410,31 +440,8 @@ export default function MainTable() {
           }
         });
 
-        // Handle propagation if needed
-        if (isPropagating) {
-          setIsPropagating(true);
-          setPropagationMessage(`Updating future schedules...`);
-
-          try {
-            const change: CellChange = {
-              field,
-              oldValue: savedValue,
-              newValue
-            };
-            
-            await propagateChangesForward([change], selectedDate);
-            setPropagationMessage('Future schedules updated');
-            setTimeout(() => {
-              setIsPropagating(false);
-            }, 2000);
-          } catch (error) {
-            console.error('Error propagating changes:', error);
-            setPropagationMessage('Failed to update future schedules');
-            setTimeout(() => {
-              setIsPropagating(false);
-            }, 3000);
-          }
-        }
+        // Track changes for simple propagation (done in handleCellEdit)
+        // No immediate propagation - changes will be applied on navigation
       } else {
         console.log('handleCellBlur: No value change, resetting undo state', {
           savedValue,
@@ -709,7 +716,7 @@ export default function MainTable() {
   // Update lastSavedState when data is loaded
   useEffect(() => {
     // Only update lastSavedState if we have actual data (not just the initial state)
-    if (data !== defaultData) {
+    if (data.length > 0) {
       setLastSavedState({
         data: [...data],
         crewInfo: { 
@@ -725,7 +732,7 @@ export default function MainTable() {
   // Update lastSavedTotalHours when data is loaded
   useEffect(() => {
     // Only update lastSavedTotalHours if we have actual data (not just the initial state)
-    if (data !== defaultData) {
+    if (data.length > 0) {
       setLastSavedTotalHours(totalHours);
     }
   }, [data, totalHours]);
@@ -804,8 +811,17 @@ export default function MainTable() {
   };
 
   const handlePreviousEntry = async () => {
-    const currentIndex = findCurrentDateIndex();
-    if (currentIndex > 0) {
+    // Prevent rapid clicks - debounce navigation
+    if (isNavigating || isSaving) {
+      console.log('Navigation blocked - already navigating or saving');
+      return;
+    }
+    
+    setIsNavigating(true);
+    
+    try {
+      const currentIndex = findCurrentDateIndex();
+      if (currentIndex > 0) {
       // Check for unsaved changes
       if (hasUnsavedChanges) {
         try {
@@ -843,80 +859,181 @@ export default function MainTable() {
       }
       const prevDateRange = savedDates[currentIndex - 1];
       await handleDateSelect(prevDateRange);
+      // Clear undo state after navigation
+      setUndoState(null);
+      setCanUndo(false);
     }
+  } catch (error) {
+    console.error('Error in handlePreviousEntry:', error);
+    showNotification('Failed to navigate to previous day. Please try again.', 'error');
+  } finally {
+    setIsNavigating(false);
+  }
   };
 
   const handleNextEntry = async () => {
-    const currentIndex = findCurrentDateIndex();
-    if (currentIndex < savedDates.length - 1) {
-      // Check for unsaved changes
-      if (hasUnsavedChanges) {
-        try {
-          setIsSaving(true);
-          const firstDate = data[0].days[0].date;
-          const secondDate = data[0].days[1].date;
-          const fullDateRange = `${firstDate} to ${secondDate}`;
-          
-          await saveCoordinator.saveRecord({
-            dateRange: fullDateRange,
-            data,
-            crewInfo: {
-              ...crewInfo,
-              checkboxStates,
-              customEntries
-            },
-            onProgress: (message) => {
-              console.log('Save progress:', message);
-            },
-            onComplete: () => {
-              setHasUnsavedChanges(false);
-              setLastSaved(Date.now());
-              console.log('Save completed:', { dateRange: fullDateRange });
-            },
-            onError: (error) => {
-              console.error('Save error:', error);
-              showNotification('Failed to save changes. Please try again.', 'error');
-              throw error;
-            }
-          });
-        } catch (error) {
-          console.error('Error saving before navigation:', error);
-          showNotification('Failed to save changes before navigating. Please try again.', 'error');
-          return;
-        } finally {
-          setIsSaving(false);
-        }
-      }
-
-      // Get the current dates
-      const firstDate = new Date(data[0].days[0].date);
-      const secondDate = new Date(data[0].days[1].date);
-      
-      // Determine if we're in single-day or consecutive-days mode
-      const isSingleDayMode = firstDate.getTime() === secondDate.getTime();
-      const dayIncrement = isSingleDayMode ? 1 : 2;
-
-      // Calculate next dates
-      const nextFirstDate = new Date(firstDate);
-      nextFirstDate.setDate(firstDate.getDate() + dayIncrement);
-      const nextFirstDateString = nextFirstDate.toISOString().split('T')[0];
-
-      const nextSecondDate = new Date(nextFirstDate);
-      if (!isSingleDayMode) {
-        nextSecondDate.setDate(nextFirstDate.getDate() + 1);
-      }
-      const nextSecondDateString = nextSecondDate.toISOString().split('T')[0];
-      
-      // Use the calculated dates for navigation
-      const nextDateRange = `${nextFirstDateString} to ${nextSecondDateString}`;
-      await handleDateSelect(nextDateRange);
+    // Prevent rapid clicks - debounce navigation
+    if (isNavigating || isSaving) {
+      console.log('Navigation blocked - already navigating or saving');
+      return;
     }
+    
+    setIsNavigating(true);
+    
+    try {
+      // Check if there's data worth saving (names, times, crew info, etc.)
+      const hasDataToSave = 
+        data.some(member => member.name || member.classification || member.days.some(day => day.on || day.off)) ||
+        crewInfo.crewName || crewInfo.crewNumber || crewInfo.fireName || crewInfo.fireNumber ||
+        customEntries.length > 0 ||
+        Object.values(checkboxStates).some(checked => checked);
+
+    // Save current data if there's anything worth saving and we have dates
+    if (hasDataToSave && data[0]?.days[0]?.date && data[0]?.days[1]?.date) {
+      try {
+        setIsSaving(true);
+        const firstDate = data[0].days[0].date;
+        const secondDate = data[0].days[1].date;
+        const fullDateRange = `${firstDate} to ${secondDate}`;
+        
+        await saveCoordinator.saveRecord({
+          dateRange: fullDateRange,
+          data,
+          crewInfo: {
+            ...crewInfo,
+            checkboxStates,
+            customEntries
+          },
+          onProgress: (message) => {
+            console.log('Save progress:', message);
+          },
+          onComplete: () => {
+            setHasUnsavedChanges(false);
+            setLastSaved(Date.now());
+            console.log('Save completed:', { dateRange: fullDateRange });
+          },
+          onError: (error) => {
+            console.error('Save error:', error);
+            showNotification('Failed to save changes. Please try again.', 'error');
+            throw error;
+          }
+        });
+      } catch (error) {
+        console.error('Error saving before navigation:', error);
+        showNotification('Failed to save changes before navigating. Please try again.', 'error');
+        return;
+      } finally {
+        setIsSaving(false);
+      }
+    }
+
+    // Get the current dates
+    const firstDate = new Date(data[0].days[0].date);
+    const secondDate = new Date(data[0].days[1].date);
+    
+    // Determine if we're in single-day or consecutive-days mode
+    const isSingleDayMode = firstDate.getTime() === secondDate.getTime();
+    const dayIncrement = isSingleDayMode ? 1 : 2;
+
+    // Calculate next dates
+    const nextFirstDate = new Date(firstDate);
+    nextFirstDate.setDate(firstDate.getDate() + dayIncrement);
+    const nextFirstDateString = nextFirstDate.toISOString().split('T')[0];
+
+    const nextSecondDate = new Date(nextFirstDate);
+    if (!isSingleDayMode) {
+      nextSecondDate.setDate(nextFirstDate.getDate() + 1);
+    }
+    const nextSecondDateString = nextSecondDate.toISOString().split('T')[0];
+
+    const nextDateRange = `${nextFirstDateString} to ${nextSecondDateString}`;
+
+    // Check if next day already exists in the database
+    const nextDateRangeExists = await stableCTRService.getRecord(nextDateRange);
+    
+    if (nextDateRangeExists) {
+      // Navigate to existing next entry
+      await handleDateSelect(nextDateRange);
+      // Clear undo state after navigation
+      setUndoState(null);
+      setCanUndo(false);
+    } else {
+      // Create new entry by copying current data forward
+      try {
+        // Create new data with copied names/classifications but blank times
+        const newData = data.map(member => ({
+          name: member.name,
+          classification: member.classification,
+          days: [
+            { date: nextFirstDateString, on: '', off: '' },
+            { date: nextSecondDateString, on: '', off: '' }
+          ]
+        }));
+
+        // Save the new record
+        await saveCoordinator.saveRecord({
+          dateRange: nextDateRange,
+          data: newData,
+          crewInfo: {
+            ...crewInfo,
+            checkboxStates,
+            customEntries
+          },
+          onProgress: (message) => {
+            console.log('Save progress:', message);
+          },
+          onComplete: () => {
+            console.log('New day created:', { dateRange: nextDateRange });
+          },
+          onError: (error) => {
+            console.error('Save error for new day:', error);
+            throw error;
+          }
+        });
+
+        // Add a small delay to ensure database operation completes
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        // Reload saved dates from database to ensure consistency
+        const updatedDateRanges = await stableCTRService.getAllDateRanges();
+        setSavedDates(updatedDateRanges);
+        
+        // Calculate the new index based on the updated dates array
+        const newIndex = updatedDateRanges.findIndex(date => date === nextDateRange);
+        
+        // Navigate to the new day with the correct index
+        // Defensive: Wait a bit more if the record is not found, then retry once
+        let record = await stableCTRService.getRecord(nextDateRange);
+        if (!record) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+          record = await stableCTRService.getRecord(nextDateRange);
+        }
+        if (record) {
+          await handleDateSelect(nextDateRange, newIndex);
+        } else {
+          showNotification('New day was not found in the database. Please refresh.', 'error');
+        }
+        
+        showNotification('New day created with crew data copied forward', 'success');
+        
+      } catch (error) {
+        console.error('Error creating new day:', error);
+        showNotification('Failed to create new day. Please try again.', 'error');
+      }
+    }
+  } catch (error) {
+    console.error('Error in handleNextEntry:', error);
+    showNotification('Failed to navigate to next day. Please try again.', 'error');
+  } finally {
+    setIsNavigating(false);
+  }
   };
 
-  const handleDateSelect = async (dateRange: string) => {
+  const handleDateSelect = async (dateRange: string, providedIndex?: number) => {
+
     if (!dateRange || dateRange === "") {
       // If no date range is selected, reset to new entry state
-      setData(defaultData);
+      setData([]);
       setCrewInfo({
         crewName: '',
         crewNumber: '',
@@ -942,11 +1059,16 @@ export default function MainTable() {
         hotline: true
       });
       setPdfId(null);
+      setHasSignedPDF(false);
+      setPdfGenerationCount(0);
+      // Clear undo state when resetting to new entry
+      setUndoState(null);
+      setCanUndo(false);
       return;
     }
 
     if (dateRange === "new") {
-      setData(defaultData);
+      setData([]);
       setCrewInfo({
         crewName: '',
         crewNumber: '',
@@ -965,6 +1087,11 @@ export default function MainTable() {
         fireNumber: ''
       });
       setPdfId(null);
+      setHasSignedPDF(false);
+      setPdfGenerationCount(0);
+      // Clear undo state when starting new entry
+      setUndoState(null);
+      setCanUndo(false);
       showNotification('New entry started', 'info');
       return;
     }
@@ -972,6 +1099,8 @@ export default function MainTable() {
     try {
       const [date1, date2] = dateRange.split(' to ');
       const record = await stableCTRService.getRecord(dateRange);
+      
+
       
       if (record) {
         // Load existing record
@@ -1000,13 +1129,21 @@ export default function MainTable() {
         
         setDays([date1, date2]);
         setSelectedDate(dateRange);
-        // Update currentDateIndex based on the selected date range
-        const newIndex = savedDates.findIndex(date => date === dateRange);
+        // Update currentDateIndex based on the selected date range or provided index
+        const newIndex = providedIndex !== undefined ? providedIndex : savedDates.findIndex(date => date === dateRange);
         setCurrentDateIndex(newIndex);
         setHasUnsavedChanges(false);
         
         // Set the PDF ID from the mapping, or null if no PDF exists for this date range
         setPdfId(pdfsByDateRange[dateRange] || null);
+        // Check if this date range has a signed PDF
+        const hasExistingPDF = !!pdfsByDateRange[dateRange];
+        setHasSignedPDF(hasExistingPDF);
+        // Set initial count based on whether PDF exists (1 if exists, 0 if not)
+        setPdfGenerationCount(hasExistingPDF ? 1 : 0);
+        // Clear undo state when loading existing record
+        setUndoState(null);
+        setCanUndo(false);
       } else {
         // Save current data with new date range
         const newData = data.map(member => ({
@@ -1045,11 +1182,18 @@ export default function MainTable() {
             showNotification('Failed to save changes. Please try again.', 'error');
           }
         });
+        // Clear undo state when creating new record
+        setUndoState(null);
+        setCanUndo(false);
       }
     } catch (error) {
       console.error('Error loading/saving record:', error);
       showNotification('Failed to load/save record', 'error');
     }
+    
+    // Don't clear changes - they're now updated to continue propagating
+    // Only clear when explicitly starting a new entry or on error
+    // Changes are updated via updateSourceDate() when propagation succeeds
   };
 
   const handleCellDoubleClick = (rowIdx: number, field: string, dayIdx?: number) => {
@@ -1154,125 +1298,19 @@ export default function MainTable() {
     }
   };
 
-  const handleCopyToNext20Days = async () => {
-    if (!selectedDate || !data || data.length === 0) {
-      showNotification('No data to copy. Please enter data first.', 'warning');
-      return;
-    }
 
-    try {
-      // Get the current dates
-      const firstDate = new Date(data[0].days[0].date);
-      const secondDate = new Date(data[0].days[1].date);
-      
-      if (isNaN(firstDate.getTime()) || isNaN(secondDate.getTime())) {
-        throw new Error('Invalid date format');
-      }
-
-      // Determine if we're in single-day or consecutive-days mode
-      const isSingleDayMode = firstDate.getTime() === secondDate.getTime();
-      const dayIncrement = isSingleDayMode ? 1 : 2; // Increment by 1 or 2 based on mode
-
-      // Save current date's data first to ensure it's in the database
-      const currentDateString = firstDate.toISOString().split('T')[0];
-      const secondDateString = secondDate.toISOString().split('T')[0];
-      await saveCoordinator.saveRecord({
-        dateRange: `${currentDateString} to ${secondDateString}`,
-        data,
-        crewInfo: {
-          ...crewInfo,
-          checkboxStates,
-          customEntries
-        },
-        onProgress: (message) => {
-          console.log('Save progress:', message);
-        },
-        onComplete: () => {
-          console.log('Save completed for current dates:', currentDateString, secondDateString);
-        },
-        onError: (error) => {
-          console.error('Save error for current dates:', currentDateString, secondDateString, error);
-          throw error;
-        }
-      });
-
-      // Get template data from current day
-      const templateData = data.map(member => ({
-        ...member,
-        days: member.days.slice(0, 2) // Take both days as template
-      }));
-
-      // Create and save entries for next 20 days/periods
-      const newDates = [];
-      for (let i = 1; i <= 20; i++) {
-        // Calculate first date of the period
-        const nextFirstDate = new Date(firstDate);
-        nextFirstDate.setDate(firstDate.getDate() + (i * dayIncrement));
-        const nextFirstDateString = nextFirstDate.toISOString().split('T')[0];
-
-        // Calculate second date of the period
-        const nextSecondDate = new Date(nextFirstDate);
-        if (!isSingleDayMode) {
-          nextSecondDate.setDate(nextFirstDate.getDate() + 1); // For consecutive days mode
-        }
-        const nextSecondDateString = nextSecondDate.toISOString().split('T')[0];
-
-        newDates.push(`${nextFirstDateString} to ${nextSecondDateString}`);
-        
-        // Create new data for this period
-        const newData = templateData.map(member => ({
-          ...member,
-          days: [
-            { date: nextFirstDateString, on: member.days[0].on, off: member.days[0].off },
-            { date: nextSecondDateString, on: member.days[1].on, off: member.days[1].off }
-          ]
-        }));
-
-        // Save the record for this period
-        await saveCoordinator.saveRecord({
-          dateRange: `${nextFirstDateString} to ${nextSecondDateString}`,
-          data: newData,
-          crewInfo: {
-            ...crewInfo,
-            checkboxStates,
-            customEntries
-          },
-          onProgress: (message) => {
-            console.log('Save progress:', message);
-          },
-          onComplete: () => {
-            console.log('Save completed for dates:', nextFirstDateString, nextSecondDateString);
-          },
-          onError: (error) => {
-            console.error('Save error for dates:', nextFirstDateString, nextSecondDateString, error);
-            throw error;
-          }
-        });
-      }
-
-      // Update saved dates in state
-      const allDates = [`${currentDateString} to ${secondDateString}`, ...newDates];
-      setSavedDates(prev => {
-        const uniqueDates = Array.from(new Set([...prev, ...allDates])).sort();
-        return uniqueDates;
-      });
-
-      showNotification('Successfully copied data to next 20 days', 'success');
-      
-      // Force reload saved dates from database to ensure everything is in sync
-      await loadSavedDates();
-      
-    } catch (error) {
-      console.error('Error copying to next 20 days:', error);
-      showNotification('Failed to copy data. Please check the date format and ensure times are entered.', 'error');
-    }
-  };
 
   const handleExportPDF = async () => {
     if (!selectedDate || !data) return;
 
     try {
-      const pdfResult = await fillCTRPDF(data, crewInfo, { downloadImmediately: false, returnBlob: true });
+      const enrichedCrewInfo = {
+        ...crewInfo,
+        checkboxStates,
+        customEntries
+      };
+
+      const pdfResult = await fillCTRPDF(data, enrichedCrewInfo, { downloadImmediately: false, returnBlob: true });
       if (!pdfResult.blob) {
         throw new Error('Failed to generate PDF blob');
       }
@@ -1296,6 +1334,8 @@ export default function MainTable() {
 
       setPdfId(pdfId);
       setShowPDFViewer(true);
+      setHasSignedPDF(true); // Mark that a PDF has been signed
+      setPdfGenerationCount(prev => prev + 1); // Increment PDF generation counter
     } catch (error) {
       console.error('Error generating PDF:', error);
       showNotification('Failed to generate PDF. Please try again.', 'error');
@@ -1360,13 +1400,20 @@ export default function MainTable() {
     reader.readAsArrayBuffer(file);
   };
 
+  // Export Excel
   const handleExportExcel = async () => {
+    // Check if selectedDate and data are defined
     if (!selectedDate || !data) return;
 
+    // Generate Excel file
     try {
       const workbook = await fillExcelTemplate(data, crewInfo, days);
+
+      // Write buffer to blob
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+      // Generate filename
       const filename = generateExportFilename({
         date: selectedDate,
         crewNumber: crewInfo.crewNumber,
@@ -1390,9 +1437,10 @@ export default function MainTable() {
     }
   };
 
+  // Reset to empty data
   const handleResetToDefault = () => {
-    if (window.confirm('Are you sure you want to reset to default data? This cannot be undone.')) {
-      setData(defaultData);
+    if (window.confirm('Are you sure you want to reset to empty data? This cannot be undone.')) {
+      setData([]);
       setHasUnsavedChanges(true);
     }
   };
@@ -1401,6 +1449,16 @@ export default function MainTable() {
   useEffect(() => {
     console.log('Undo button state:', { canUndo, isSaving, undoState });
   }, [canUndo, isSaving, undoState]);
+
+  // Debug logging for Sign PDF button state
+  useEffect(() => {
+    console.log('Sign PDF button state:', { 
+      selectedDate, 
+      hasData: !!data, 
+      isDisabled: !selectedDate || !data,
+      showSettings 
+    });
+  }, [selectedDate, data, showSettings]);
 
   return (
     <div className="ctr-container">
@@ -1440,27 +1498,19 @@ export default function MainTable() {
           <button
             className="ctr-btn"
             onClick={handlePreviousEntry}
-            disabled={currentDateIndex <= 0}
+            disabled={currentDateIndex <= 0 || isNavigating || isSaving}
+            style={{ background: currentDateIndex <= 0 || isNavigating || isSaving ? '#ccc' : '#ff9800' }}
           >
             ← Previous Day
           </button>
           <button
             className="ctr-btn"
             onClick={handleNextEntry}
-            disabled={currentDateIndex >= savedDates.length - 1}
+            disabled={!data[0]?.days[0]?.date || !data[0]?.days[1]?.date || isNavigating || isSaving}
+            style={{ background: !data[0]?.days[0]?.date || !data[0]?.days[1]?.date || isNavigating || isSaving ? '#ccc' : '#ff9800' }}
           >
             Next Day →
           </button>
-          <button
-            className="ctr-btn ctr-copy-button"
-            onClick={handleCopyToNext20Days}
-            disabled={isSaving}
-          >
-            Copy to Next 20 Days
-          </button>
-        </div>
-        <div className="ctr-theme-toggle">
-          <ThemeToggle />
         </div>
       </div>
 
@@ -1540,15 +1590,9 @@ export default function MainTable() {
       </div>
 
       {/* Remarks Section */}
-      <div className="collapsible-section">
-        <button 
-          className="collapse-toggle"
-          onClick={() => setIsCollapsed(!isCollapsed)}
-        >
-          {isCollapsed ? '▼' : '▲'} Remarks
-        </button>
-        <div className={`collapse-content ${isCollapsed ? 'collapsed' : ''}`}>
-          <div className="checkbox-options">
+      <div className="remarks-section">
+        <h3 className="remarks-title">Remarks</h3>
+        <div className="checkbox-options">
             {/* HOTLINE - interactive now */}
             <div className="checkbox-option">
               <input
@@ -1640,11 +1684,17 @@ export default function MainTable() {
               </button>
             </div>
           </div>
-        </div>
       </div>
 
       <div className="ctr-actions">
-        <button className="ctr-btn" onClick={handleExportPDF}>Save to PDF</button>
+        <button 
+          className="ctr-btn" 
+          onClick={handleExportPDF}
+          disabled={!selectedDate || !data}
+          style={{ background: !selectedDate || !data ? '#ccc' : '#1976d2' }}
+        >
+          {pdfGenerationCount > 0 ? 'Sign New PDF' : 'Sign PDF'}
+        </button>
         <PrintableTable 
           data={data} 
           crewInfo={{
@@ -1654,26 +1704,37 @@ export default function MainTable() {
           }} 
           days={days} 
         />
+        {/* PDF Mini Viewport - Shows PDF directly instead of button */}
         {pdfId && (
-          <button 
-            className="ctr-btn sign-btn" 
-            onClick={() => {
-              setIsSigningMode(true);
-              setShowPDFViewer(true);
-            }}
-            style={{ background: '#4caf50' }}
-          >
-            Sign PDF
-          </button>
+          <div className="pdf-mini-viewport">
+            <div className="pdf-mini-header">
+              <h4>Generated PDF</h4>
+              <button 
+                className="pdf-mini-edit-btn"
+                onClick={() => {
+                  setIsSigningMode(true);
+                  setShowPDFViewer(true);
+                }}
+                title="Edit/Sign PDF"
+              >
+                ✏️ Edit
+              </button>
+            </div>
+            <div className="pdf-mini-container">
+              <PDFViewer 
+                pdfId={pdfId}
+                className="pdf-mini-preview"
+                style={{ 
+                  width: '100%', 
+                  height: '200px',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  overflow: 'hidden'
+                }}
+              />
+            </div>
+          </div>
         )}
-        <button 
-          className="ctr-btn" 
-          onClick={handleRemoveEntry}
-          disabled={!selectedDate}
-          style={{ background: '#d32f2f' }}
-        >
-          Remove Entry
-        </button>
       </div>
       <div className="ctr-table-container">
         <table className="ctr-table">
@@ -1952,21 +2013,36 @@ export default function MainTable() {
             </button>
             <button className="settings-btn-item" onClick={handleResetToDefault}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M3 12a9 9 0 019-9 9.75 9.75 0 017.071 3.172L21 8" />
+                <path d="M3 12a9 9 0 919-9 9.75 9.75 0 017.071 3.172L21 8" />
                 <path d="M21 3v5h-5" />
                 <path d="M21 12a9 9 0 01-9 9 9.75 9.75 0 01-7.071-3.172L3 16" />
                 <path d="M3 21v-5h5" />
               </svg>
               Reset to Default
             </button>
+
+            <button 
+              className="settings-btn-item" 
+              onClick={handleRemoveEntry}
+              disabled={!selectedDate}
+              style={{ background: !selectedDate ? '#ccc' : '#d32f2f' }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 6h18" />
+                <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                <line x1="10" y1="11" x2="10" y2="17" />
+                <line x1="14" y1="11" x2="14" y2="17" />
+              </svg>
+              Remove Entry
+            </button>
+            <div className="settings-btn-item theme-toggle-wrapper">
+              <ThemeToggle />
+            </div>
           </div>
         </div>
       </div>
 
-      <PropagationIndicator 
-        isVisible={isPropagating}
-        message={propagationMessage}
-      />
+      {/* Simple propagation - no indicators needed */}
     </div>
   );
 }
