@@ -8,7 +8,7 @@ import { generateExportFilename } from '../utils/filenameGenerator';
 
 // Configure PDF.js worker
 if (typeof window !== 'undefined' && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.mjs';
 }
 
 // Configure PDF.js options for small PDFs
@@ -97,10 +97,16 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
       if (container) {
         const containerWidth = container.clientWidth;
         const containerHeight = container.clientHeight;
-        const scale = Math.min(
-          containerWidth / viewport.width,
-          containerHeight / viewport.height
-        );
+        
+        // For signing purposes, we want the PDF to be as large as possible
+        // Calculate scales for both width and height
+        const scaleWidth = containerWidth / viewport.width;
+        const scaleHeight = containerHeight / viewport.height;
+        
+        // Use the larger scale to maximize PDF size for better signing experience
+        // But ensure it doesn't exceed container bounds and cap at 200% for usability
+        const scale = Math.min(Math.max(scaleWidth, scaleHeight), 2.0);
+        
         viewport.scale = scale;
       }
       
@@ -166,6 +172,7 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
     };
   };
 
+  // starts the drawing
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     if (!drawCanvasRef.current || !isDrawingMode) return;
     
@@ -185,6 +192,7 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
     setIsDrawing(true);
   };
 
+  // draws the signature
   const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     if (!isDrawing || !drawCanvasRef.current || !lastPosRef.current || !isDrawingMode) return;
     
@@ -215,11 +223,13 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
     lastPosRef.current = currentPos;
   };
 
+  // stops the drawing
   const stopDrawing = () => {
     setIsDrawing(false);
     lastPosRef.current = null;
   };
 
+  // clears the drawing
   const clearDrawing = () => {
     setIsDrawingMode(false);
     const canvas = drawCanvasRef.current;

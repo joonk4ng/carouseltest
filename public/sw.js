@@ -5,7 +5,7 @@ const urlsToCache = [
   './',
   './index.html',
   './manifest.json',
-  './pdf.worker.min.mjs',
+  './pdf.worker.mjs',
   './CTR_Fillable_Edited.pdf',
   './pdfjskit/pdfjskit.min.css',
   './pdfjskit/pdfjs/web/viewer.mjs',

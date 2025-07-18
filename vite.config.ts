@@ -16,7 +16,7 @@ const copyPdfWorker = () => ({
   name: 'copy-pdf-worker',
   buildStart() {
     const workerSrc = resolve(__dirname, 'node_modules/pdfjs-dist/build/pdf.worker.mjs');
-    const workerDest = resolve(__dirname, 'public/pdf.worker.min.mjs');
+    const workerDest = resolve(__dirname, 'public/pdf.worker.mjs');
     
     // Only copy if the file doesn't exist or is older than the source
     if (!fs.existsSync(workerDest) || 
