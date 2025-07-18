@@ -1,7 +1,0 @@
-/* Import mobile styles by default */
-@import './mobile/PDFPreviewViewer.css';
-
-/* Override with desktop styles for larger screens */
-@media screen and (min-width: 768px) {
-  @import './desktop/PDFPreviewViewer.css';
-} 
