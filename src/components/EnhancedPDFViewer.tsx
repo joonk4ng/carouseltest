@@ -67,7 +67,6 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
   const lastPosRef = useRef<{ x: number; y: number } | null>(null);
   const renderTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [isDrawingMode, setIsDrawingMode] = useState(false);
-  const [zoomLevel, setZoomLevel] = useState(1);
 
   const renderPDF = useCallback(async (pdfDoc: pdfjsLib.PDFDocumentProxy) => {
     if (!canvasRef.current || !drawCanvasRef.current) return;
@@ -166,29 +165,7 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
     };
   }, [isDrawingMode]);
 
-  // Detect zoom level changes
-  useEffect(() => {
-    const updateZoomLevel = () => {
-      const zoom = window.visualViewport?.scale || 1;
-      setZoomLevel(zoom);
-    };
 
-    // Initial zoom level
-    updateZoomLevel();
-
-    // Listen for zoom changes
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', updateZoomLevel);
-      window.visualViewport.addEventListener('scroll', updateZoomLevel);
-    }
-
-    return () => {
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', updateZoomLevel);
-        window.visualViewport.removeEventListener('scroll', updateZoomLevel);
-      }
-    };
-  }, []);
 
   // function to get the touch position
   const getTouchPos = (e: React.TouchEvent<HTMLCanvasElement>) => {
@@ -674,53 +651,25 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
       
       {/* Move toolbar outside canvas container to avoid zoom issues */}
       {!readOnly && (
-        <div 
-          className="toolbar fixed-toolbar"
-          style={{
-            transform: `scale(${zoomLevel})`,
-            transformOrigin: 'bottom center',
-            height: `${60 / zoomLevel}px`,
-            minHeight: `${50 / zoomLevel}px`
-          }}
-        >
+        <div className="toolbar fixed-toolbar">
           <button
             onClick={toggleDrawingMode}
             className={`draw-btn ${isDrawingMode ? 'active' : ''}`}
             title="Sign"
-            style={{
-              fontSize: `${18 / zoomLevel}px`,
-              minHeight: `${60 / zoomLevel}px`
-            }}
           >
-            <svg viewBox="0 0 24 24" width={`${24 / zoomLevel}`} height={`${24 / zoomLevel}`}>
+            <svg viewBox="0 0 24 24" width="24" height="24">
               <path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
             </svg>
             Sign
           </button>
-          <button 
-            onClick={handleSave} 
-            className="save-btn" 
-            title="Finished"
-            style={{
-              fontSize: `${18 / zoomLevel}px`,
-              minHeight: `${60 / zoomLevel}px`
-            }}
-          >
-            <svg viewBox="0 0 24 24" width={`${24 / zoomLevel}`} height={`${24 / zoomLevel}`}>
+          <button onClick={handleSave} className="save-btn" title="Finished">
+            <svg viewBox="0 0 24 24" width="24" height="24">
               <path fill="currentColor" d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/>
             </svg>
             Finished
           </button>
-          <button 
-            onClick={clearDrawing} 
-            className="clear-btn" 
-            title="Undo"
-            style={{
-              fontSize: `${18 / zoomLevel}px`,
-              minHeight: `${60 / zoomLevel}px`
-            }}
-          >
-            <svg viewBox="0 0 24 24" width={`${24 / zoomLevel}`} height={`${24 / zoomLevel}`}>
+          <button onClick={clearDrawing} className="clear-btn" title="Undo">
+            <svg viewBox="0 0 24 24" width="24" height="24">
               <path fill="currentColor" d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/>
             </svg>
             Undo

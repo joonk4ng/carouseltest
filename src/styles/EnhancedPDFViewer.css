@@ -56,10 +56,11 @@
   will-change: transform;
   /* Ensure it's above everything else */
   z-index: 9999 !important;
-  /* Set transform origin for scaling */
-  transform-origin: bottom center !important;
-  /* Allow dynamic scaling */
-  transition: transform 0.1s ease-out;
+  /* Lock button sizes to prevent zoom scaling */
+  height: 60px !important;
+  min-height: 50px !important;
+  /* Prevent any scaling transformations */
+  transform: none !important;
 }
 
 .toolbar button {
@@ -76,6 +77,8 @@
   transition: all 0.2;
   cursor: pointer;
   min-height: 60px;
+  /* Prevent button scaling with page zoom */
+  transform: none !important;
 }
 
 .toolbar button svg {
