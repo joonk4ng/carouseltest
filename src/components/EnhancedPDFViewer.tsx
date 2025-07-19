@@ -8,7 +8,7 @@ import { generateExportFilename } from '../utils/filenameGenerator';
 
 // Configure PDF.js worker
 if (typeof window !== 'undefined' && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.mjs';
 }
 
 // Configure PDF.js options for small PDFs
@@ -81,7 +81,9 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
         willReadFrequently: false  // Optimize for write-only operations
       });
       
+      // retrieves the draw canvas
       const drawCanvas = drawCanvasRef.current;
+      // retrieves the drawing context
       const drawContext = drawCanvas.getContext('2d', {
         alpha: true,
         willReadFrequently: true  // Drawing needs read operations
@@ -97,10 +99,13 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
       if (container) {
         const containerWidth = container.clientWidth;
         const containerHeight = container.clientHeight;
-        const scale = Math.min(
-          containerWidth / viewport.width,
-          containerHeight / viewport.height
-        );
+        
+        // Calculate scales for both width and height
+        const scaleWidth = containerWidth / viewport.width;
+        const scaleHeight = containerHeight / viewport.height;
+
+        const scale = Math.min(Math.max(scaleWidth, scaleHeight), 2.0);
+        
         viewport.scale = scale;
       }
       
@@ -122,6 +127,7 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
       }).promise;
 
       setIsLoading(false);
+    // return error messages
     } catch (err) {
       console.error('Error rendering page:', err);
       setError('Failed to render page. Please try again.');
@@ -143,10 +149,12 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
       }
     };
 
+    // add event listeners for the touch events
     container.addEventListener('touchstart', preventDefault, options);
     container.addEventListener('touchmove', preventDefault, options);
     container.addEventListener('touchend', preventDefault, options);
 
+    // return a function to clean up the event listeners
     return () => {
       container.removeEventListener('touchstart', preventDefault);
       container.removeEventListener('touchmove', preventDefault);
@@ -154,11 +162,17 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
     };
   }, [isDrawingMode]);
 
+  // function to get the touch position
   const getTouchPos = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    // if the draw canvas is not ready, return 0,0
     if (!drawCanvasRef.current) return { x: 0, y: 0 };
+    // retrieves the touch
     const touch = e.touches[0];
+    // retrieves the bounding client rect
     const rect = drawCanvasRef.current.getBoundingClientRect();
+    // retrieves the scale
     const scaleX = drawCanvasRef.current.width / rect.width;
+    // retrieves the scale
     const scaleY = drawCanvasRef.current.height / rect.height;
     return {
       x: (touch.clientX - rect.left) * scaleX,
@@ -166,11 +180,15 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
     };
   };
 
+  // starts the drawing
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     if (!drawCanvasRef.current || !isDrawingMode) return;
     
+    // retrieves the position
     let pos;
+    // if the event is a touch event, get the touch position
     if ('touches' in e) {
+      // get the touch position
       pos = getTouchPos(e as React.TouchEvent<HTMLCanvasElement>);
     } else {
       const rect = drawCanvasRef.current.getBoundingClientRect();
@@ -185,13 +203,17 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
     setIsDrawing(true);
   };
 
+  // draws the signature
   const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     if (!isDrawing || !drawCanvasRef.current || !lastPosRef.current || !isDrawingMode) return;
     
+    // retrieves the current position
     let currentPos;
+    // if the event is a touch event, get the touch position
     if ('touches' in e) {
       currentPos = getTouchPos(e as React.TouchEvent<HTMLCanvasElement>);
     } else {
+      // if the event is a mouse event, get the mouse position
       const rect = drawCanvasRef.current.getBoundingClientRect();
       const scaleX = drawCanvasRef.current.width / rect.width;
       const scaleY = drawCanvasRef.current.height / rect.height;
@@ -201,10 +223,13 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
       };
     }
 
+    // retrieves the context
     const ctx = drawCanvasRef.current.getContext('2d');
     if (!ctx) return;
 
+    // begins the path
     ctx.beginPath();
+    // sets the stroke style
     ctx.strokeStyle = drawColor;
     ctx.lineWidth = drawWidth;
     ctx.lineCap = 'round';
@@ -212,30 +237,38 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
     ctx.lineTo(currentPos.x, currentPos.y);
     ctx.stroke();
 
+    // updates the last position
     lastPosRef.current = currentPos;
   };
 
+  // function to stop the drawing
   const stopDrawing = () => {
     setIsDrawing(false);
     lastPosRef.current = null;
   };
 
+  // function to clear the drawing
   const clearDrawing = () => {
     setIsDrawingMode(false);
+    // retrieves the canvas
     const canvas = drawCanvasRef.current;
     if (!canvas) return;
+    // retrieves the context
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    // clears the drawing
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   };
 
-  // Handles the saving of the PDF with the signature
+  // function to handle the saving of the PDF with the signature
   const handleSave = async () => {
+    // sets the drawing mode to false
     setIsDrawingMode(false);
+    // if the canvas is not ready, return
     if (!canvasRef.current || !drawCanvasRef.current || !onSave || !pdfDocRef.current) return;
 
     try {
-      // Get both canvases
+      // retrieves both canvases
       const baseCanvas = canvasRef.current;
       const drawCanvas = drawCanvasRef.current;
 
@@ -244,7 +277,8 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
       tempCanvas.width = baseCanvas.width;
       tempCanvas.height = baseCanvas.height;
       const tempCtx = tempCanvas.getContext('2d');
-      
+
+      // if the context is not ready, return
       if (!tempCtx) return;
 
       // Draw the base PDF
@@ -335,6 +369,7 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
     }
   };
 
+  // function to handle the downloading of the PDF (unused)
   const handleDownload = async () => {
     setIsDrawingMode(false);
     if (!pdfDocRef.current) return;
@@ -377,6 +412,7 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
     }
   };
 
+  // function to handle the printing of the PDF (unused)
   const handlePrint = async () => {
     setIsDrawingMode(false);
     if (!pdfDocRef.current) {
@@ -472,6 +508,7 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
     }
   };
 
+  // function to activate the drawing mode when the button is clicked
   const toggleDrawingMode = () => {
     setIsDrawingMode(prev => !prev);
     // Clear any existing drawing when toggling mode
@@ -486,17 +523,22 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
     lastPosRef.current = null;
   };
 
+  // use effect to load the PDF
   useEffect(() => {
     let mounted = true;
     let currentPdf: pdfjsLib.PDFDocumentProxy | null = null;
 
+    // function to load the PDF
     const loadPDF = async () => {
       if (!pdfId) return;
 
       try {
+        // sets the loading state to true
         setIsLoading(true);
+        // sets the error to null
         setError(null);
         
+        // retrieves the stored PDF
         const storedPDF = await getPDF(pdfId);
         if (!storedPDF || !mounted) return;
 
@@ -510,8 +552,10 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
           ...pdfOptions
         });
         
+        // loads the PDF
         const pdf = await loadingTask.promise;
         
+        // if the PDF is not mounted, destroy the PDF and return
         if (!mounted) {
           pdf.destroy();
           return;
@@ -570,7 +614,7 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
               onTouchMove={draw}
               onTouchEnd={stopDrawing}
             />
-            <div className="toolbar">
+            <div className="toolbar fixed-toolbar">
               <button
                 onClick={toggleDrawingMode}
                 className={`draw-btn ${isDrawingMode ? 'active' : ''}`}
@@ -581,11 +625,11 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
                 </svg>
                 Sign
               </button>
-              <button onClick={handleSave} className="save-btn" title="Save">
+              <button onClick={handleSave} className="save-btn" title="Finished">
                 <svg viewBox="0 0 24 24" width="24" height="24">
                   <path fill="currentColor" d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/>
                 </svg>
-                Save
+                Finished
               </button>
               <button onClick={clearDrawing} className="clear-btn" title="Undo">
                 <svg viewBox="0 0 24 24" width="24" height="24">
@@ -598,24 +642,7 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
         )}
       </div>
 
-      {!readOnly && (
-        <div className="drawing-controls">
-          <input
-            type="color"
-            value={drawColor}
-            onChange={(e) => setDrawColor(e.target.value)}
-            title="Drawing Color"
-          />
-          <input
-            type="range"
-            min="1"
-            max="20"
-            value={drawWidth}
-            onChange={(e) => setDrawWidth(Number(e.target.value))}
-            title="Drawing Width"
-          />
-        </div>
-      )}
+
     </div>
   );
 };

@@ -15,7 +15,7 @@ import { DateCalendar } from './DateCalendar';
 import EnhancedPDFViewer from './EnhancedPDFViewer';
 import PDFPreviewViewer from './PDFPreviewViewer';
 import PDFViewer from './PDFViewer';
-import { storePDF, listPDFs } from '../utils/pdfStorage';
+import { storePDF, listPDFs, getPDF } from '../utils/pdfStorage';
 import ExcelJS from 'exceljs';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import type { Workbook } from 'xlsx-populate';
@@ -1702,25 +1702,80 @@ export default function MainTable() {
             checkboxStates,
             customEntries
           }} 
-          days={days} 
+          days={days}
+          onBeforePrint={async () => {
+            // Sneaky save - save data before opening PDF viewer
+            try {
+              const enrichedCrewInfo = {
+                ...crewInfo,
+                checkboxStates,
+                customEntries
+              };
+              
+              await stableCTRService.saveRecord(days[0], days[1], data, enrichedCrewInfo);
+              
+              // Update last saved state
+              setLastSavedState({
+                data: data,
+                crewInfo: crewInfo,
+                days: days
+              });
+              setLastSavedTotalHours(totalHours);
+              setLastSavedCrewInfo(crewInfo);
+              setHasUnsavedChanges(false);
+              setLastSaved(Date.now());
+              
+              console.log('Sneaky save completed before PDF generation');
+            } catch (error) {
+              console.error('Sneaky save failed:', error);
+              // Don't show error to user - this is a background save
+            }
+          }}
         />
         {/* PDF Mini Viewport - Shows PDF directly instead of button */}
         {pdfId && (
           <div className="pdf-mini-viewport">
             <div className="pdf-mini-header">
               <h4>Generated PDF</h4>
-              <button 
-                className="pdf-mini-edit-btn"
-                onClick={() => {
-                  setIsSigningMode(true);
-                  setShowPDFViewer(true);
-                }}
-                title="Edit/Sign PDF"
-              >
-                ✏️ Edit
-              </button>
             </div>
-            <div className="pdf-mini-container">
+            <div 
+              className="pdf-mini-container"
+              onClick={async () => {
+                try {
+                  // Get the PDF blob from storage
+                  const storedPDF = await getPDF(pdfId);
+                  if (storedPDF) {
+                    // Create a URL for the PDF blob
+                    const url = URL.createObjectURL(storedPDF.pdf);
+                    
+                    // Try to open in new tab with error handling
+                    const newWindow = window.open(url, '_blank');
+                    
+                    // Check if popup was blocked
+                    if (!newWindow) {
+                      // Fallback: trigger download instead
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.download = storedPDF.metadata?.filename || 'document.pdf';
+                      link.target = '_blank';
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                    }
+                    
+                    // Clean up the URL after a short delay
+                    setTimeout(() => {
+                      URL.revokeObjectURL(url);
+                    }, 2000); // Increased timeout for GitHub Pages
+                  }
+                } catch (error) {
+                  console.error('Error opening PDF:', error);
+                  // Show user-friendly error message
+                  showNotification('Unable to open PDF. Please try again.', 'error');
+                }
+              }}
+              style={{ cursor: 'pointer' }}
+            >
               <PDFViewer 
                 pdfId={pdfId}
                 className="pdf-mini-preview"
@@ -1924,15 +1979,6 @@ export default function MainTable() {
       {showPDFViewer && pdfId && (
         <div className="modal">
           <div className="modal-content pdf-modal">
-            <button 
-              className="modal-close-btn"
-              onClick={() => {
-                setShowPDFViewer(false);
-                setIsSigningMode(false);
-              }}
-            >
-              Finished
-            </button>
             <EnhancedPDFViewer
               pdfId={pdfId}
               readOnly={false}
