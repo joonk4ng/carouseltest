@@ -1,13 +1,17 @@
+// microservice handler for the printable table for HTML printing
 import React from 'react';
 import { CrewMember, CrewInfo } from '../types/CTRTypes';
 import { calculateTotalHours } from '../utils/timeCalculations';
 
+// PrintableTableProps interface
 interface PrintableTableProps {
   data: CrewMember[];
   crewInfo: CrewInfo;
   days: string[];
+  onBeforePrint?: () => Promise<void> | void;
 }
 
+// format the date
 const formatDate = (dateStr: string): string => {
   if (!dateStr) return '';
   // Convert from YYYY-MM-DD to YY-MM-DD
@@ -18,16 +22,21 @@ const formatDate = (dateStr: string): string => {
   return dateStr;
 };
 
-const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days }) => {
-  const handlePrint = () => {
+// Function to render the PrintableTable component
+const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days, onBeforePrint }) => {
+  const handlePrint = async () => {
+    if (onBeforePrint) {
+      await onBeforePrint();
+    }
     // Open a new window with the print template
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    // HTML template
+    // HTML template - DO NOT CHANGE THIS TEMPLATE
     const template = `<!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         @page {
             margin-top: 0.45cm;
@@ -39,6 +48,72 @@ const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days })
             font-size: 6pt;
             margin: 0;
             padding: 0;
+        }
+
+        .back-btn {
+            position: fixed;
+            bottom: 8px;
+            left: 8px;
+            background: #07f;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 3px;
+            font-size: 11px;
+            cursor: pointer;
+            z-index: 9999;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            max-width: 80px;
+        }
+
+        .back-btn:hover {
+            background: #056;
+        }
+
+        .print-btn {
+            position: fixed;
+            bottom: 8px;
+            right: 8px;
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 3px;
+            font-size: 11px;
+            cursor: pointer;
+            z-index: 9999;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            max-width: 80px;
+        }
+
+        .print-btn:hover {
+            background: #218838;
+        }
+
+        @media print {
+            .back-btn, .print-btn {
+                display: none !important;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .back-btn {
+                font-size: 14px;
+                padding: 10px 16px;
+                border-radius: 5px;
+                bottom: 12px;
+                left: 12px;
+                max-width: 100px;
+            }
+            
+            .print-btn {
+                font-size: 14px;
+                padding: 10px 16px;
+                border-radius: 5px;
+                bottom: 12px;
+                right: 12px;
+                max-width: 100px;
+            }
         }
 
         table {
@@ -98,6 +173,12 @@ const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days })
     </style>
 </head>
 <body>
+    <!-- Back Button -->
+    <button class="back-btn" onclick="window.close()">← Back</button>
+    
+    <!-- Print Button -->
+    <button class="print-btn" onclick="window.print()">🖨️ Print</button>
+    
     <!-- Crew Info Table -->
     <table class="header-table">
         <colgroup>
@@ -251,17 +332,20 @@ const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days })
           // Filter out empty rows from the data
           const validData = data.filter(member => member.name || member.classification);
 
+          // iterate through the tbody rows
           tbodyRows.forEach((row, index) => {
             const cells = row.querySelectorAll('td');
+            // if the row does not have enough cells, return
             if (cells.length < 7) {
               console.warn(`Row ${index} does not have enough cells`);
               return;
             }
 
+            // get the member data
             const member = validData[index];
-            
+
             try {
-              // If we have data for this row, update it
+              // if we have data for this row, update it
               if (member && member.name) {
                 // Only populate rows that have actual data
                 cells[0].textContent = ''; // Leave the first column empty
@@ -333,6 +417,31 @@ const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days })
         printWindow.document.write('<!DOCTYPE html>');
         printWindow.document.write(tempDiv.innerHTML);
         printWindow.document.close();
+        
+        // Ensure the buttons are visible by adding them again if needed
+        setTimeout(() => {
+          if (printWindow.document.body) {
+            // Check if buttons exist, if not add them
+            let backBtn = printWindow.document.querySelector('.back-btn') as HTMLButtonElement | null;
+            let printBtn = printWindow.document.querySelector('.print-btn') as HTMLButtonElement | null;
+            
+            if (!backBtn) {
+              backBtn = printWindow.document.createElement('button') as HTMLButtonElement;
+              backBtn.className = 'back-btn';
+              backBtn.onclick = () => printWindow.close();
+              backBtn.textContent = '← Back';
+              printWindow.document.body.appendChild(backBtn);
+            }
+            
+            if (!printBtn) {
+              printBtn = printWindow.document.createElement('button') as HTMLButtonElement;
+              printBtn.className = 'print-btn';
+              printBtn.onclick = () => printWindow.print();
+              printBtn.textContent = '🖨️ Print';
+              printWindow.document.body.appendChild(printBtn);
+            }
+          }
+        }, 200);
 
         // Print the window after ensuring content is loaded
         printWindow.onload = () => {
