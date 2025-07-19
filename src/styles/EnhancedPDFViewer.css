@@ -11,29 +11,16 @@
   position: relative;
   overflow: auto;
   background: white;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 20px;
+  /* Inline styles will override these for better mobile zoom handling */
 }
 
 .pdf-canvas {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  max-width: 100%;
-  max-height: 100%;
+  /* Inline styles will handle positioning for better mobile zoom */
 }
 
 .draw-canvas {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
   cursor: crosshair;
-  max-width: 100%;
-  max-height: 100%;
+  /* Inline styles will handle positioning for better mobile zoom */
 }
 
 .toolbar {

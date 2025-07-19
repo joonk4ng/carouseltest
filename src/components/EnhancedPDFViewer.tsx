@@ -599,15 +599,43 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
 
   return (
     <div className={`enhanced-pdf-viewer ${className || ''}`} style={style} ref={containerRef}>
-      <div className="canvas-container">
+      <div 
+        className="canvas-container"
+        style={{ 
+          width: '100%', 
+          height: '100%', 
+          overflow: 'auto',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center', // Center for better vertical centering
+          padding: '20px', // Add padding to prevent PDF from touching edges
+          position: 'relative'
+        }}
+      >
         {error && <div className="error-message">{error}</div>}
         {isLoading && <div className="loading">Loading PDF...</div>}
-        <canvas ref={canvasRef} className="pdf-canvas" />
+        <canvas 
+          ref={canvasRef} 
+          className="pdf-canvas"
+          style={{
+            maxWidth: '100%',
+            maxHeight: '100%',
+            objectFit: 'contain'
+          }}
+        />
         {!readOnly && (
           <canvas
             ref={drawCanvasRef}
             className="draw-canvas"
-            style={{ pointerEvents: isDrawingMode ? 'auto' : 'none' }}
+            style={{ 
+              pointerEvents: isDrawingMode ? 'auto' : 'none',
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              maxWidth: '100%',
+              maxHeight: '100%'
+            }}
             onMouseDown={startDrawing}
             onMouseMove={draw}
             onMouseUp={stopDrawing}
