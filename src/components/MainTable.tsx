@@ -1885,7 +1885,7 @@ export default function MainTable() {
                 onClick={handleOpenPDFPreview}
                 style={{ 
                   width: '100%', 
-                  height: '200px',
+                  height: '400px',
                   border: '1px solid #ddd',
                   borderRadius: '4px',
                   overflow: 'hidden',
