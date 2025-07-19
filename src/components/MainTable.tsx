@@ -73,7 +73,7 @@ function loadData(): CrewMember[] {
   return [];
 }
 
-// Add deep comparison utility
+// function to perform a deep comparison of two objects
 function deepEqual(obj1: any, obj2: any): boolean {
   if (obj1 === obj2) return true;
   if (typeof obj1 !== 'object' || obj1 === null || typeof obj2 !== 'object' || obj2 === null) {
@@ -322,12 +322,14 @@ export default function MainTable() {
       selectedDateType: typeof selectedDate
     });
     
+    // If there's a selected date
     if (selectedDate) {
       try {
         const oldValue = dayIdx !== undefined 
           ? (data[rowIdx]?.days?.[dayIdx]?.[field as keyof Day] || '')
           : (data[rowIdx]?.[field as keyof CrewMember] || '');
         
+        // Get the change type
         const changeType = dayIdx !== undefined 
           ? 'time' as const
           : (field === 'name' ? 'name' as const : 'classification' as const);
@@ -350,15 +352,18 @@ export default function MainTable() {
     }
   };
 
+  // Handles the cell blur event
   const handleCellBlur = async (field: string, newValue: string, rowIndex: number, dayIndex?: number) => {
+    // Check if there's no selected date or data
     if (!selectedDate || !data) {
       console.log('handleCellBlur: No selectedDate or data', { selectedDate, data });
       return;
     }
 
+    // Try to get the saved record from IndexedDB
     try {
-      // Get the saved state from IndexedDB
       const savedRecord = await stableCTRService.getRecord(selectedDate);
+      // If no saved record is found, return
       if (!savedRecord) {
         console.log('handleCellBlur: No saved record found for date', { selectedDate });
         return;
@@ -366,8 +371,10 @@ export default function MainTable() {
 
       // Get the saved value
       let savedValue = '';
+      // If the field is a time entry field, get the saved value
       if (dayIndex !== undefined) {
         const timeValue = savedRecord.data[rowIndex]?.days[dayIndex]?.[field as keyof Day];
+        // If the saved value is a string, set it to the saved value
         savedValue = typeof timeValue === 'string' ? timeValue : '';
         console.log('handleCellBlur: Got saved time value', { 
           rowIndex, 
@@ -378,7 +385,9 @@ export default function MainTable() {
           newValue 
         });
       } else {
+        // If the field is a name or classification field, get the saved value
         const fieldValue = savedRecord.data[rowIndex]?.[field as keyof CrewMember];
+        // If the saved value is a string, set it to the saved value
         savedValue = typeof fieldValue === 'string' ? fieldValue : '';
         console.log('handleCellBlur: Got saved field value', { 
           rowIndex, 
@@ -434,6 +443,7 @@ export default function MainTable() {
               }
             });
           },
+          // If there's an error, show a notification
           onError: (error) => {
             console.error('Save error:', error);
             showNotification('Failed to save changes. Please try again.', 'error');
@@ -452,17 +462,21 @@ export default function MainTable() {
         setCanUndo(false);
       }
     } catch (error) {
+      // If there's an error, show a notification
       console.error('Error in handleCellBlur:', error);
       showNotification('Error processing change', 'error');
     }
   };
 
+  // Handles the undo operation
   const handleUndo = async () => {
+    // Log the undo operation
     console.log('handleUndo: Starting undo operation', {
       undoState,
       canUndo
     });
 
+    // Check if there's no undo state or if the undo is not enabled
     if (!undoState || !canUndo) {
       console.log('handleUndo: Cannot undo - no state or not enabled', {
         undoState,
@@ -471,8 +485,10 @@ export default function MainTable() {
       return;
     }
 
+    // Create a copy of the current data
     const newData = [...data];
     
+    // If the undo state is a time entry field
     if (undoState.dayIndex !== undefined) {
       // Undo time entry field
       if (!newData[undoState.rowIndex]?.days[undoState.dayIndex]) {
@@ -487,6 +503,7 @@ export default function MainTable() {
           off: '' 
         };
       }
+      // Log the undo operation
       console.log('handleUndo: Undoing time entry', {
         rowIndex: undoState.rowIndex,
         dayIndex: undoState.dayIndex,
@@ -532,37 +549,41 @@ export default function MainTable() {
     setUndoState(null);
   };
 
+  // Handles the checkbox change
   const handleCheckboxChange = async (option: keyof typeof checkboxStates) => {
-    // Record state before making the change
-    // recordState({ // This line is removed as per the edit hint
-    //   data, // This line is removed as per the edit hint
-    //   crewInfo, // This line is removed as per the edit hint
-    //   checkboxStates, // This line is removed as per the edit hint
-    //   customEntries // This line is removed as per the edit hint
-    // }); // This line is removed as per the edit hint
-
+    // Set the checkbox states
     setCheckboxStates(prev => {
       const newStates = { ...prev };
-      
+
+      // If turning on travel, automatically uncheck hotline
       if (option === 'travel') {
-        // If turning on travel, automatically uncheck hotline
         if (!prev.travel) {
           newStates.hotline = false;
         }
         newStates.travel = !prev.travel;
       } else if (option === 'hotline') {
+        // If turning on hotline, automatically uncheck travel
+        if (!prev.hotline) {
+          newStates.travel = false;
+        }
         newStates.hotline = !prev.hotline;
       } else {
+        // For other checkboxes, toggle the state
         newStates[option] = !prev[option];
       }
-      
+
+      // Return the new states
       return newStates;
     });
 
     // Save after checkbox change
     try {
       setIsSaving(true);
+
+      // Get the full date range
       const fullDateRange = selectedDate ? `${selectedDate} to ${days[1]}` : 'draft';
+
+      // Save the record
       await saveCoordinator.saveRecord({
         dateRange: fullDateRange,
         data,
@@ -575,20 +596,24 @@ export default function MainTable() {
           },
           customEntries
         },
+        // If there's an error, show a notification
         onProgress: (message) => {
           console.log('Save progress:', message);
         },
+        // If the save is complete, set the has unsaved changes to false, set the last saved to the current time, and log the save completed
         onComplete: () => {
           setHasUnsavedChanges(false);
           setLastSaved(Date.now());
           console.log('Save completed:', { dateRange: fullDateRange });
         },
+        // If there's an error, show a notification
         onError: (error) => {
           console.error('Save error:', error);
           showNotification('Failed to save changes. Please try again.', 'error');
         }
       });
     } catch (error) {
+      // If there's an error, show a notification
       console.error('Save error:', error);
       showNotification('Failed to save changes. Please try again.', 'error');
     } finally {
@@ -596,7 +621,9 @@ export default function MainTable() {
     }
   };
 
+  // Handles the add entry operation
   const handleAddEntry = async () => {
+    // If the new entry is not empty and not already in the custom entries
     if (newEntry.trim() && !customEntries.includes(newEntry.trim())) {
       const updatedEntries = [...customEntries, newEntry.trim()];
       setCustomEntries(updatedEntries);
@@ -617,17 +644,20 @@ export default function MainTable() {
           onProgress: (message) => {
             console.log('Save progress:', message);
           },
+          // If the save is complete, set the has unsaved changes to false, set the last saved to the current time, and log the save completed
           onComplete: () => {
             setHasUnsavedChanges(false);
             setLastSaved(Date.now());
             console.log('Save completed:', { dateRange: fullDateRange });
           },
+          // If there's an error, show a notification
           onError: (error) => {
             console.error('Save error:', error);
             showNotification('Failed to save changes. Please try again.', 'error');
           }
         });
       } catch (error) {
+        // If there's an error, show a notification
         console.error('Save error:', error);
         showNotification('Failed to save changes. Please try again.', 'error');
       } finally {
@@ -636,7 +666,9 @@ export default function MainTable() {
     }
   };
 
+  // Handles the remove custom entry operation
   const handleRemoveCustomEntry = async (entryToRemove: string) => {
+    // Update the custom entries
     const updatedEntries = customEntries.filter(entry => entry !== entryToRemove);
     setCustomEntries(updatedEntries);
 
@@ -652,20 +684,24 @@ export default function MainTable() {
           checkboxStates,
           customEntries: updatedEntries
         },
+        // If there's an error, show a notification
         onProgress: (message) => {
           console.log('Save progress:', message);
         },
+        // If the save is complete, set the has unsaved changes to false, set the last saved to the current time, and log the save completed
         onComplete: () => {
           setHasUnsavedChanges(false);
           setLastSaved(Date.now());
           console.log('Save completed:', { dateRange: fullDateRange });
         },
+        // If there's an error, show a notification
         onError: (error) => {
           console.error('Save error:', error);
           showNotification('Failed to save changes. Please try again.', 'error');
         }
       });
     } catch (error) {
+      // If there's an error, show a notification
       console.error('Save error:', error);
       showNotification('Failed to save changes. Please try again.', 'error');
     } finally {
@@ -673,6 +709,7 @@ export default function MainTable() {
     }
   };
 
+  // Handles the key press event
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleAddEntry();
@@ -699,12 +736,15 @@ export default function MainTable() {
                  pdf.metadata.fireName === fireName &&
                  pdf.metadata.fireNumber === fireNumber;
         });
+        // If the matching date range is found, add it to the pdf mapping
         if (matchingDateRange) {
           pdfMapping[matchingDateRange] = pdf.id;
         }
       });
+      // Set the pdfs by date range
       setPdfsByDateRange(pdfMapping);
-      
+
+      // If there are date ranges, select the first one
       if (dateRanges.length > 0) {
         const firstDateRange = dateRanges[0];
         await handleDateSelect(firstDateRange);
@@ -785,9 +825,11 @@ export default function MainTable() {
       hasDates
     );
 
+    // Set the has unsaved changes
     setHasUnsavedChanges(hasChanges);
   }, [totalHours, crewInfo, days, lastSavedTotalHours, lastSavedCrewInfo, checkboxStates, customEntries, lastSavedState]);
 
+  // Loads the saved dates
   const loadSavedDates = async () => {
     try {
       const dateRanges = await stableCTRService.getAllDateRanges();
@@ -797,28 +839,34 @@ export default function MainTable() {
     }
   };
 
+  // Shows the notification
   const showNotification = (message: string, type: 'success' | 'info' | 'warning' | 'error') => {
     setNotification({ message, type, show: true });
   };
 
+  // Hides the notification
   const hideNotification = () => {
     setNotification(prev => ({ ...prev, show: false }));
   };
 
+  // Finds the current date index
   const findCurrentDateIndex = () => {
     if (!selectedDate) return -1;
     return savedDates.findIndex(date => date === selectedDate);
   };
 
+  // Handles the previous entry operation
   const handlePreviousEntry = async () => {
     // Prevent rapid clicks - debounce navigation
     if (isNavigating || isSaving) {
       console.log('Navigation blocked - already navigating or saving');
       return;
     }
-    
+
+    // Set the is navigating to true
     setIsNavigating(true);
-    
+
+    // Try to find the current date index
     try {
       const currentIndex = findCurrentDateIndex();
       if (currentIndex > 0) {
@@ -835,14 +883,17 @@ export default function MainTable() {
               checkboxStates,
               customEntries
             },
+            // If there's an error, show a notification
             onProgress: (message) => {
               console.log('Save progress:', message);
             },
+            // If the save is complete, set the has unsaved changes to false, set the last saved to the current time, and log the save completed
             onComplete: () => {
               setHasUnsavedChanges(false);
               setLastSaved(Date.now());
               console.log('Save completed:', { dateRange: fullDateRange });
             },
+            // If there's an error, show a notification
             onError: (error) => {
               console.error('Save error:', error);
               showNotification('Failed to save changes. Please try again.', 'error');
@@ -850,6 +901,7 @@ export default function MainTable() {
             }
           });
         } catch (error) {
+          // If there's an error, show a notification
           console.error('Error saving before navigation:', error);
           showNotification('Failed to save changes before navigating. Please try again.', 'error');
           return; // Prevent navigation if save fails
@@ -857,13 +909,16 @@ export default function MainTable() {
           setIsSaving(false);
         }
       }
+      // Get the previous date range
       const prevDateRange = savedDates[currentIndex - 1];
+      // Navigate to the previous date range
       await handleDateSelect(prevDateRange);
       // Clear undo state after navigation
       setUndoState(null);
       setCanUndo(false);
     }
   } catch (error) {
+    // If there's an error, show a notification
     console.error('Error in handlePreviousEntry:', error);
     showNotification('Failed to navigate to previous day. Please try again.', 'error');
   } finally {
@@ -871,15 +926,18 @@ export default function MainTable() {
   }
   };
 
+  // Handles the next entry operation
   const handleNextEntry = async () => {
     // Prevent rapid clicks - debounce navigation
     if (isNavigating || isSaving) {
       console.log('Navigation blocked - already navigating or saving');
       return;
     }
-    
+
+    // Set the is navigating to true
     setIsNavigating(true);
-    
+
+    // Try to get the current date index
     try {
       // Check if there's data worth saving (names, times, crew info, etc.)
       const hasDataToSave = 
@@ -919,6 +977,7 @@ export default function MainTable() {
           }
         });
       } catch (error) {
+        // If there's an error, show a notification
         console.error('Error saving before navigation:', error);
         showNotification('Failed to save changes before navigating. Please try again.', 'error');
         return;
@@ -940,14 +999,17 @@ export default function MainTable() {
     nextFirstDate.setDate(firstDate.getDate() + dayIncrement);
     const nextFirstDateString = nextFirstDate.toISOString().split('T')[0];
 
+    // Calculate the next second date
     const nextSecondDate = new Date(nextFirstDate);
     if (!isSingleDayMode) {
       nextSecondDate.setDate(nextFirstDate.getDate() + 1);
     }
     const nextSecondDateString = nextSecondDate.toISOString().split('T')[0];
 
+    // Calculate the next date range
     const nextDateRange = `${nextFirstDateString} to ${nextSecondDateString}`;
 
+    // Check if the next date range already exists in the database
     // Check if next day already exists in the database
     const nextDateRangeExists = await stableCTRService.getRecord(nextDateRange);
     
@@ -1008,12 +1070,13 @@ export default function MainTable() {
           await new Promise(resolve => setTimeout(resolve, 200));
           record = await stableCTRService.getRecord(nextDateRange);
         }
+        // If the record is found, navigate to the new day with the correct index
         if (record) {
           await handleDateSelect(nextDateRange, newIndex);
         } else {
           showNotification('New day was not found in the database. Please refresh.', 'error');
         }
-        
+        // If the record is not found, show a notification
         showNotification('New day created with crew data copied forward', 'success');
         
       } catch (error) {
@@ -1029,8 +1092,10 @@ export default function MainTable() {
   }
   };
 
+  // Handles the date select operation
   const handleDateSelect = async (dateRange: string, providedIndex?: number) => {
 
+    // If no date range is selected, reset to new entry state
     if (!dateRange || dateRange === "") {
       // If no date range is selected, reset to new entry state
       setData([]);
@@ -1257,18 +1322,16 @@ export default function MainTable() {
     setHasUnsavedChanges(true);
   };
 
+  // Handles the crew info blur operation
   const handleCrewInfoBlur = async () => {
-    // Record state before saving
-    // recordState({ // This line is removed as per the edit hint
-    //   data, // This line is removed as per the edit hint
-    //   crewInfo, // This line is removed as per the edit hint
-    //   checkboxStates, // This line is removed as per the edit hint
-    //   customEntries // This line is removed as per the edit hint
-    // }); // This line is removed as per the edit hint
-
+    // Try to save the record
     try {
       setIsSaving(true);
+
+      // Get the full date range
       const fullDateRange = selectedDate ? `${selectedDate} to ${days[1]}` : 'draft';
+
+      // Save the record
       await saveCoordinator.saveRecord({
         dateRange: fullDateRange,
         data,
@@ -1298,34 +1361,19 @@ export default function MainTable() {
     }
   };
 
-
-
+  // Handles the export PDF operation
   const handleExportPDF = async () => {
     if (!selectedDate || !data) return;
 
     try {
-      // Sneaky save - save data before generating PDF
+      // Create a new enriched crew info
       const enrichedCrewInfo = {
         ...crewInfo,
         checkboxStates,
         customEntries
       };
-      
-      await stableCTRService.saveRecord(days[0], days[1], data, enrichedCrewInfo);
-      
-      // Update last saved state
-      setLastSavedState({
-        data: data,
-        crewInfo: crewInfo,
-        days: days
-      });
-      setLastSavedTotalHours(totalHours);
-      setLastSavedCrewInfo(crewInfo);
-      setHasUnsavedChanges(false);
-      setLastSaved(Date.now());
-      
-      console.log('Sneaky save completed before PDF generation');
 
+      // Generate the PDF
       const pdfResult = await fillCTRPDF(data, enrichedCrewInfo, { downloadImmediately: false, returnBlob: true });
       if (!pdfResult.blob) {
         throw new Error('Failed to generate PDF blob');
@@ -1358,6 +1406,7 @@ export default function MainTable() {
     }
   };
 
+  // Handles the remove entry operation
   const handleRemoveEntry = async () => {
     if (!selectedDate || !data) return;
 
@@ -1367,6 +1416,7 @@ export default function MainTable() {
     setHasUnsavedChanges(true);
   };
 
+  // Handles the header date change operation
   const handleHeaderDateChange = async (e: React.ChangeEvent<HTMLInputElement>, idx: number) => {
     const newDate = e.target.value;
     const newDays = days.map((d, i) => (i === idx ? newDate : d));
@@ -1384,19 +1434,23 @@ export default function MainTable() {
     }
   };
 
+  // Handles the delete operation
   const handleDelete = (idx: number) => {
     const newData = data.filter((_, i) => i !== idx);
     setData(newData);
     setHasUnsavedChanges(true);
   };
 
+  // Handles the excel upload operation (Found in Settings)
   const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Create a new file reader
     const reader = new FileReader();
     reader.onload = async (event) => {
       try {
+        // Create a new workbook
         const workbook = new ExcelJS.Workbook();
         await workbook.xlsx.load(event.target?.result as ArrayBuffer);
         const worksheet = workbook.worksheets[0];
@@ -1475,6 +1529,104 @@ export default function MainTable() {
       showSettings 
     });
   }, [selectedDate, data, showSettings]);
+
+  // Handles opening the PDF in a new tab for preview
+  const handleOpenPDFPreview = async () => {
+    if (!pdfId) {
+      showNotification('No PDF available to preview', 'error');
+      return;
+    }
+
+    try {
+      // Get the PDF from storage
+      const pdfData = await getPDF(pdfId);
+      if (!pdfData) {
+        showNotification('PDF not found in storage', 'error');
+        return;
+      }
+
+      // Create a blob URL for the PDF
+      const blobUrl = URL.createObjectURL(pdfData.pdf);
+      
+      // Open the PDF in a new tab
+      const newWindow = window.open(blobUrl, '_blank');
+      
+      if (!newWindow) {
+        showNotification('Please allow popups to view the PDF', 'error');
+        URL.revokeObjectURL(blobUrl);
+        return;
+      }
+
+      // Log the filename for debugging (the browser tab will show the blob URL, but we know the proper name)
+      if (pdfData.metadata?.filename) {
+        console.log('Opening PDF with filename:', pdfData.metadata.filename);
+      }
+
+      // Also trigger download with proper filename
+      const downloadUrl = URL.createObjectURL(pdfData.pdf);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = pdfData.metadata?.filename || 'CTR_Document.pdf';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(downloadUrl);
+
+      // Clean up the blob URL after a delay to ensure the new window has loaded
+      setTimeout(() => {
+        URL.revokeObjectURL(blobUrl);
+      }, 1000);
+
+    } catch (error) {
+      console.error('Error opening PDF preview:', error);
+      showNotification('Failed to open PDF preview', 'error');
+    }
+  };
+
+  // Handles the sneaky save operation in printing table
+  const sneakySave = async () => {
+    // If there's no data, return
+    if (!data.length) return;
+
+    // Try to save the record
+    try {
+      setIsSaving(true);
+      const firstDate = data[0].days[0]?.date;
+      const secondDate = data[0].days[1]?.date;
+      if (!firstDate || !secondDate) return;
+      const fullDateRange = `${firstDate} to ${secondDate}`;
+      await saveCoordinator.saveRecord({
+        dateRange: fullDateRange,
+        data,
+        crewInfo: {
+          ...crewInfo,
+          checkboxStates,
+          customEntries
+        },
+        // If there's an error, show a notification
+        onProgress: (message) => {
+          console.log('Sneaky save progress:', message);
+        },
+        // If the save is complete, set the has unsaved changes to false, set the last saved to the current time, and log the save completed
+        onComplete: () => {
+          setHasUnsavedChanges(false);
+          setLastSaved(Date.now());
+          showNotification('Checkpoint saved before printing', 'success');
+        },
+        // If there's an error, show a notification
+        onError: (error) => {
+          console.error('Sneaky save error:', error);
+          showNotification('Failed to save checkpoint before printing', 'error');
+        }
+      });
+    } catch (error) {
+      // If there's an error, show a notification
+      console.error('Sneaky save error:', error);
+      showNotification('Failed to save checkpoint before printing', 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="ctr-container">
@@ -1718,35 +1870,8 @@ export default function MainTable() {
             checkboxStates,
             customEntries
           }} 
-          days={days}
-          onBeforePrint={async () => {
-            // Sneaky save - save data before opening PDF viewer
-            try {
-              const enrichedCrewInfo = {
-                ...crewInfo,
-                checkboxStates,
-                customEntries
-              };
-              
-              await stableCTRService.saveRecord(days[0], days[1], data, enrichedCrewInfo);
-              
-              // Update last saved state
-              setLastSavedState({
-                data: data,
-                crewInfo: crewInfo,
-                days: days
-              });
-              setLastSavedTotalHours(totalHours);
-              setLastSavedCrewInfo(crewInfo);
-              setHasUnsavedChanges(false);
-              setLastSaved(Date.now());
-              
-              console.log('Sneaky save completed before PDF generation');
-            } catch (error) {
-              console.error('Sneaky save failed:', error);
-              // Don't show error to user - this is a background save
-            }
-          }}
+          days={days} 
+          onBeforePrint={sneakySave}
         />
         {/* PDF Mini Viewport - Shows PDF directly instead of button */}
         {pdfId && (
@@ -1754,77 +1879,48 @@ export default function MainTable() {
             <div className="pdf-mini-header">
               <h4>Generated PDF</h4>
             </div>
-            <div 
-              className="pdf-mini-container"
-              onClick={async () => {
-                try {
-                  // Sneaky save - save data before opening PDF
-                  const enrichedCrewInfo = {
-                    ...crewInfo,
-                    checkboxStates,
-                    customEntries
-                  };
-                  
-                  await stableCTRService.saveRecord(days[0], days[1], data, enrichedCrewInfo);
-                  
-                  // Update last saved state
-                  setLastSavedState({
-                    data: data,
-                    crewInfo: crewInfo,
-                    days: days
-                  });
-                  setLastSavedTotalHours(totalHours);
-                  setLastSavedCrewInfo(crewInfo);
-                  setHasUnsavedChanges(false);
-                  setLastSaved(Date.now());
-                  
-                  console.log('Sneaky save completed before opening PDF');
-                  
-                  // Get the PDF blob from storage
-                  const storedPDF = await getPDF(pdfId);
-                  if (storedPDF) {
-                    // Create a URL for the PDF blob
-                    const url = URL.createObjectURL(storedPDF.pdf);
-                    
-                    // Try to open in new tab with error handling
-                    const newWindow = window.open(url, '_blank');
-                    
-                    // Check if popup was blocked
-                    if (!newWindow) {
-                      // Fallback: trigger download instead
-                      const link = document.createElement('a');
-                      link.href = url;
-                      link.download = storedPDF.metadata?.filename || 'document.pdf';
-                      link.target = '_blank';
-                      document.body.appendChild(link);
-                      link.click();
-                      document.body.removeChild(link);
-                    }
-                    
-                    // Clean up the URL after a short delay
-                    setTimeout(() => {
-                      URL.revokeObjectURL(url);
-                    }, 2000); // Increased timeout for GitHub Pages
-                  }
-                } catch (error) {
-                  console.error('Error opening PDF:', error);
-                  // Show user-friendly error message
-                  showNotification('Unable to open PDF. Please try again.', 'error');
-                }
-              }}
-              style={{ cursor: 'pointer' }}
-            >
-              <PDFViewer 
-                pdfId={pdfId}
+            <div className="pdf-mini-container">
+              <div 
                 className="pdf-mini-preview"
+                onClick={handleOpenPDFPreview}
                 style={{ 
                   width: '100%', 
                   height: '200px',
                   border: '1px solid #ddd',
                   borderRadius: '4px',
-                  overflow: 'hidden'
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                  position: 'relative'
                 }}
-              />
+                title="Click to open PDF in new tab and download"
+              >
+                <PDFViewer 
+                  pdfId={pdfId}
+                  style={{ 
+                    width: '100%', 
+                    height: '100%'
+                  }}
+                />
+                <div 
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    background: 'rgba(0, 0, 0, 0.7)',
+                    color: 'white',
+                    padding: '8px 12px',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    pointerEvents: 'none',
+                    opacity: 0,
+                    transition: 'opacity 0.2s'
+                  }}
+                  className="pdf-preview-overlay"
+                >
+                  Click to open & download PDF
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -2026,6 +2122,7 @@ export default function MainTable() {
                 fireNumber: crewInfo.fireNumber
               }}
               date={days[0]}
+              onBeforeSign={sneakySave}
               onSave={async (blob) => {
                 try {
                   // Store the annotated version with the same ID to overwrite the original

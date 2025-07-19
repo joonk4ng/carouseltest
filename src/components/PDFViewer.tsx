@@ -4,7 +4,7 @@ import { getPDF } from '../utils/pdfStorage';
 
 // Configure PDF.js worker
 if (typeof window !== 'undefined' && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.mjs';
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 }
 
 interface PDFViewerProps {
@@ -78,7 +78,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ pdfId, onLoad, className, style }
         if (onLoad) {
           onLoad();
         }
-      } catch (error: unknown) {
+      } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
         const errorStack = error instanceof Error ? error.stack : undefined;
         
@@ -109,14 +109,10 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ pdfId, onLoad, className, style }
       // Get PDF page dimensions
       const viewport = page.getViewport({ scale: 1 });
       
-      // Calculate scale to fit width while maintaining aspect ratio
-      // For signing purposes, we want the PDF to be as large as possible
+      // Calculate scale to fit width
       const scaleWidth = containerWidth / viewport.width;
       const scaleHeight = containerHeight / viewport.height;
-      
-      // Use the larger scale to maximize PDF size for better signing experience
-      // But ensure it doesn't exceed container bounds
-      const scale = Math.min(scaleWidth, scaleHeight, 2.0); // Cap at 200% zoom for usability
+      const scale = Math.min(scaleWidth, scaleHeight);
 
       // Update viewport with new scale
       const scaledViewport = page.getViewport({ scale });
@@ -169,19 +165,11 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ pdfId, onLoad, className, style }
         overflow: 'auto',
         display: 'flex',
         justifyContent: 'center',
-        alignItems: 'center', // Changed from flex-start to center for better vertical centering
-        padding: '20px', // Add some padding to prevent PDF from touching edges
+        alignItems: 'flex-start',
         ...style 
       }}
     >
-      <canvas 
-        ref={canvasRef} 
-        style={{
-          maxWidth: '100%',
-          maxHeight: '100%',
-          objectFit: 'contain'
-        }}
-      />
+      <canvas ref={canvasRef} />
     </div>
   );
 };
