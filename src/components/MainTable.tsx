@@ -1304,11 +1304,27 @@ export default function MainTable() {
     if (!selectedDate || !data) return;
 
     try {
+      // Sneaky save - save data before generating PDF
       const enrichedCrewInfo = {
         ...crewInfo,
         checkboxStates,
         customEntries
       };
+      
+      await stableCTRService.saveRecord(days[0], days[1], data, enrichedCrewInfo);
+      
+      // Update last saved state
+      setLastSavedState({
+        data: data,
+        crewInfo: crewInfo,
+        days: days
+      });
+      setLastSavedTotalHours(totalHours);
+      setLastSavedCrewInfo(crewInfo);
+      setHasUnsavedChanges(false);
+      setLastSaved(Date.now());
+      
+      console.log('Sneaky save completed before PDF generation');
 
       const pdfResult = await fillCTRPDF(data, enrichedCrewInfo, { downloadImmediately: false, returnBlob: true });
       if (!pdfResult.blob) {
@@ -1742,6 +1758,28 @@ export default function MainTable() {
               className="pdf-mini-container"
               onClick={async () => {
                 try {
+                  // Sneaky save - save data before opening PDF
+                  const enrichedCrewInfo = {
+                    ...crewInfo,
+                    checkboxStates,
+                    customEntries
+                  };
+                  
+                  await stableCTRService.saveRecord(days[0], days[1], data, enrichedCrewInfo);
+                  
+                  // Update last saved state
+                  setLastSavedState({
+                    data: data,
+                    crewInfo: crewInfo,
+                    days: days
+                  });
+                  setLastSavedTotalHours(totalHours);
+                  setLastSavedCrewInfo(crewInfo);
+                  setHasUnsavedChanges(false);
+                  setLastSaved(Date.now());
+                  
+                  console.log('Sneaky save completed before opening PDF');
+                  
                   // Get the PDF blob from storage
                   const storedPDF = await getPDF(pdfId);
                   if (storedPDF) {
