@@ -126,8 +126,6 @@
 
 
 
-
-
 .error-message {
   position: absolute;
   top: 50%;
@@ -177,6 +175,10 @@
   }
 
   .toolbar {
+    display: none;
+  }
+
+  .drawing-controls {
     display: none;
   }
 

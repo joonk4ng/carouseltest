@@ -100,10 +100,13 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
         const containerWidth = container.clientWidth;
         const containerHeight = container.clientHeight;
         
+        // For signing purposes, we want the PDF to be as large as possible
         // Calculate scales for both width and height
         const scaleWidth = containerWidth / viewport.width;
         const scaleHeight = containerHeight / viewport.height;
-
+        
+        // Use the larger scale to maximize PDF size for better signing experience
+        // But ensure it doesn't exceed container bounds and cap at 200% for usability
         const scale = Math.min(Math.max(scaleWidth, scaleHeight), 2.0);
         
         viewport.scale = scale;
@@ -241,13 +244,13 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
     lastPosRef.current = currentPos;
   };
 
-  // function to stop the drawing
+  // stops the drawing
   const stopDrawing = () => {
     setIsDrawing(false);
     lastPosRef.current = null;
   };
 
-  // function to clear the drawing
+  // clears the drawing
   const clearDrawing = () => {
     setIsDrawingMode(false);
     // retrieves the canvas
