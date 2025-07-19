@@ -50,14 +50,16 @@
   /* Use viewport units to ensure proper positioning during zoom */
   width: 100vw !important;
   max-width: 100vw !important;
-  /* Prevent any parent transforms from affecting positioning */
-  transform: translateZ(0) !important;
   /* Ensure it's positioned relative to the viewport, not any parent container */
   position: fixed !important;
   /* Force hardware acceleration and prevent zoom issues */
   will-change: transform;
   /* Ensure it's above everything else */
   z-index: 9999 !important;
+  /* Set transform origin for scaling */
+  transform-origin: bottom center !important;
+  /* Allow dynamic scaling */
+  transition: transform 0.1s ease-out;
 }
 
 .toolbar button {
