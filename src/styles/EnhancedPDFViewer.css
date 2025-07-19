@@ -59,8 +59,14 @@
   /* Lock button sizes to prevent zoom scaling */
   height: 60px !important;
   min-height: 50px !important;
-  /* Prevent any scaling transformations */
-  transform: none !important;
+  /* Prevent scaling with page zoom */
+  transform: scale(1) !important;
+  transform-origin: bottom center !important;
+  /* Use physical pixels to maintain size */
+  font-size: 16px !important;
+  /* Force hardware acceleration */
+  backface-visibility: hidden !important;
+  -webkit-backface-visibility: hidden !important;
 }
 
 .toolbar button {
@@ -78,7 +84,11 @@
   cursor: pointer;
   min-height: 60px;
   /* Prevent button scaling with page zoom */
-  transform: none !important;
+  transform: scale(1) !important;
+  transform-origin: center !important;
+  /* Force consistent sizing */
+  font-size: 16px !important;
+  min-height: 50px !important;
 }
 
 .toolbar button svg {
@@ -184,6 +194,9 @@
     will-change: transform;
     /* Ensure it's positioned relative to the viewport */
     position: fixed !important;
+    /* Prevent scaling with page zoom on mobile */
+    transform: scale(1) !important;
+    font-size: 16px !important;
   }
 }
 
