@@ -25,6 +25,7 @@ import '../styles/components/PrintableTable.css';
 import { AutoSaveStatus } from './AutoSaveStatus';
 import '../styles/AutoSaveStatus.css';
 import { ThemeToggle } from './ThemeToggle';
+import { storeImage, getImage, ImageData } from '../utils/imageStorage';
 
 
 
@@ -1628,6 +1629,75 @@ export default function MainTable() {
     }
   };
 
+  // Add state for image storage
+  const [imageId, setImageId] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+
+  // Load image for selected date
+  useEffect(() => {
+    const loadImage = async () => {
+      if (!selectedDate) {
+        setImageId(null);
+        setImageUrl(null);
+        return;
+      }
+      const id = `${selectedDate}_${crewInfo.crewNumber}_${crewInfo.fireName}_${crewInfo.fireNumber}`;
+      setImageId(id);
+      const imgData = await getImage(id);
+      if (imgData && imgData.image) {
+        setImageUrl(URL.createObjectURL(imgData.image));
+      } else {
+        setImageUrl(null);
+      }
+    };
+    loadImage();
+    // Clean up object URL on unmount/change
+    return () => {
+      if (imageUrl) URL.revokeObjectURL(imageUrl);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate, crewInfo.crewNumber, crewInfo.fireName, crewInfo.fireNumber]);
+
+  // Handle image upload/take
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !selectedDate) return;
+    // Only allow image types
+    if (!file.type.startsWith('image/')) {
+      showNotification('Please select a valid image file.', 'error');
+      return;
+    }
+    // Store with minimal compression (original file)
+    const filename = `${selectedDate}_${crewInfo.crewNumber}_${crewInfo.fireName}_${crewInfo.fireNumber}_image.${file.name.split('.').pop()}`;
+    const id = await storeImage(file, {
+      filename,
+      date: selectedDate,
+      crewNumber: crewInfo.crewNumber,
+      fireName: crewInfo.fireName,
+      fireNumber: crewInfo.fireNumber,
+      mimeType: file.type,
+    });
+    setImageId(id);
+    setImageUrl(URL.createObjectURL(file));
+    showNotification('Image saved for this date entry.', 'success');
+  };
+
+  // Handle image click (view/download)
+  const handleOpenImage = async () => {
+    if (!imageId) {
+      showNotification('No image available to view', 'error');
+      return;
+    }
+    const imgData = await getImage(imageId);
+    if (!imgData || !imgData.image) {
+      showNotification('Image not found in storage', 'error');
+      return;
+    }
+    const url = URL.createObjectURL(imgData.image);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  };
+
   return (
     <div className="ctr-container">
       <div className="ctr-sticky-header">
@@ -1855,230 +1925,106 @@ export default function MainTable() {
       </div>
 
       <div className="ctr-actions">
-        <button 
-          className="ctr-btn" 
-          onClick={handleExportPDF}
-          disabled={!selectedDate || !data}
-          style={{ background: !selectedDate || !data ? '#ccc' : '#1976d2' }}
-        >
-          {pdfGenerationCount > 0 ? 'Sign New PDF' : 'Sign PDF'}
-        </button>
-        <PrintableTable 
-          data={data} 
-          crewInfo={{
-            ...crewInfo,
-            checkboxStates,
-            customEntries
-          }} 
-          days={days} 
-          onBeforePrint={sneakySave}
-        />
-        {/* PDF Mini Viewport - Shows PDF directly instead of button */}
-        {pdfId && (
-          <div className="pdf-mini-viewport">
-            <div className="pdf-mini-header">
-              <h4>Generated PDF</h4>
+        <div style={{ display: 'flex', gap: 16, marginBottom: 20 }}>
+          <button 
+            className="ctr-btn" 
+            onClick={handleExportPDF}
+            disabled={!selectedDate || !data}
+            style={{ background: !selectedDate || !data ? '#ccc' : '#1976d2' }}
+          >
+            {pdfGenerationCount > 0 ? 'Sign New PDF' : 'Sign PDF'}
+          </button>
+          <PrintableTable 
+            data={data} 
+            crewInfo={{
+              ...crewInfo,
+              checkboxStates,
+              customEntries
+            }} 
+            days={days} 
+            onBeforePrint={sneakySave}
+          />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'row', gap: '24px', alignItems: 'stretch', width: '100%' }}>
+          {/* PDF Panel */}
+          <div className="pdf-mini-viewport" style={{ flex: 1, minWidth: 0, maxWidth: '100%', display: 'flex', flexDirection: 'column', height: 340, justifyContent: 'flex-start' }}>
+            <div className="pdf-mini-header" style={{ marginBottom: 8, display: 'flex', alignItems: 'center', height: 32 }}>
+              <h4 style={{ margin: 0, fontWeight: 600, fontSize: 18, textAlign: 'left', lineHeight: '32px' }}>Generated PDF</h4>
             </div>
-            <div className="pdf-mini-container">
-              <div 
-                className="pdf-mini-preview"
-                onClick={handleOpenPDFPreview}
-                style={{ 
-                  width: '100%', 
-                  height: '400px',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  overflow: 'hidden',
-                  cursor: 'pointer',
-                  position: 'relative'
-                }}
-                title="Click to open PDF in new tab and download"
-              >
-                <PDFViewer 
-                  pdfId={pdfId}
-                  style={{ 
-                    width: '100%', 
-                    height: '100%'
-                  }}
-                />
+            <div className="pdf-mini-container" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {pdfId ? (
                 <div 
-                  style={{
-                    position: 'absolute',
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    background: 'rgba(0, 0, 0, 0.7)',
-                    color: 'white',
-                    padding: '8px 12px',
+                  className="pdf-mini-preview"
+                  onClick={handleOpenPDFPreview}
+                  style={{ 
+                    width: '100%',
+                    height: '100%',
+                    border: '1px solid #ddd',
                     borderRadius: '4px',
-                    fontSize: '12px',
-                    pointerEvents: 'none',
-                    opacity: 0,
-                    transition: 'opacity 0.2s'
+                    overflow: 'hidden',
+                    cursor: 'pointer',
+                    position: 'relative',
+                    background: '#fff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
                   }}
-                  className="pdf-preview-overlay"
+                  title="Click to open PDF in new tab and download"
                 >
-                  Click to open & download PDF
+                  <PDFViewer 
+                    pdfId={pdfId}
+                    style={{ width: '100%', height: '100%' }}
+                  />
+                  <div 
+                    style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: '50%',
+                      transform: 'translate(-50%, -50%)',
+                      background: 'rgba(0, 0, 0, 0.7)',
+                      color: 'white',
+                      padding: '8px 12px',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      pointerEvents: 'none',
+                      opacity: 0,
+                      transition: 'opacity 0.2s'
+                    }}
+                    className="pdf-preview-overlay"
+                  >
+                    Click to open & download PDF
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <span style={{ color: '#aaa', fontSize: 16 }}>No PDF for this date</span>
+              )}
             </div>
           </div>
-        )}
-      </div>
-      <div className="ctr-table-container">
-        <table className="ctr-table">
-          <thead>
-            <tr>
-              <th className="ctr-th name" rowSpan={2}>NAME</th>
-              <th className="ctr-th class" rowSpan={2}>JOB TITLE</th>
-              {days.map((date, i) => (
-                <th className="ctr-th date" colSpan={2} key={i}>
-                  DATE<br />
-                  <input
-                    className="ctr-input ctr-date"
-                    type="date"
-                    value={date}
-                    onChange={e => handleHeaderDateChange(e, i)}
-                  />
-                </th>
-              ))}
-              <th className="ctr-th" rowSpan={2}></th>
-            </tr>
-            <tr>
-              {days.map((_, i) => (
-                <React.Fragment key={i}>
-                  <th className="ctr-th">ON</th>
-                  <th className="ctr-th">OFF</th>
-                </React.Fragment>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {Array.from({ length: 20 }).map((_, idx) => {
-              const row = data[idx] || {
-                name: '',
-                classification: '',
-                days: days.map(date => ({ date, on: '', off: '' }))
-              };
-              
-              return (
-                <tr key={idx} className="ctr-tr">
-                  <td className="ctr-td name-col">
-                    {editingCell?.row === idx && editingCell?.field === 'name' ? (
-                      <input
-                        className="ctr-input"
-                        value={row.name || ''}
-                        onChange={e => handleCellEdit(e, idx, 'name')}
-                        onBlur={e => handleCellBlur('name', e.target.value, idx)}
-                        autoFocus
-                      />
-                    ) : (
-                      <div
-                        className="ctr-cell-content"
-                        onDoubleClick={!isTouchDevice ? () => handleCellDoubleClick(idx, 'name') : undefined}
-                        onClick={isTouchDevice ? () => handleCellDoubleClick(idx, 'name') : undefined}
-                      >
-                        {row.name
-                          ? row.name
-                              .split(/(?<=[a-z])(?=[A-Z])/)
-                              .map((part, i) => (
-                                <span key={i} style={{ display: 'block', wordBreak: 'break-word' }}>{part}</span>
-                              ))
-                          : ''}
-                      </div>
-                    )}
-                  </td>
-                  <td className="ctr-td class-col">
-                    {editingCell?.row === idx && editingCell?.field === 'classification' ? (
-                      <input
-                        className="ctr-input"
-                        value={row.classification}
-                        onChange={e => handleCellEdit(e, idx, 'classification')}
-                        onBlur={e => handleCellBlur('classification', e.target.value, idx)}
-                        autoFocus
-                      />
-                    ) : (
-                      <div
-                        className="ctr-cell-content"
-                        onDoubleClick={!isTouchDevice ? () => handleCellDoubleClick(idx, 'classification') : undefined}
-                        onClick={isTouchDevice ? () => handleCellDoubleClick(idx, 'classification') : undefined}
-                      >
-                        {row.classification}
-                      </div>
-                    )}
-                  </td>
-                  {row.days.map((day, dayIdx) => (
-                    <React.Fragment key={dayIdx}>
-                      <td className="ctr-td time-col">
-                        {editingCell?.row === idx && editingCell?.field === 'on' && editingCell?.dayIdx === dayIdx ? (
-                          <input
-                            className="ctr-input ctr-on"
-                            value={day.on}
-                            onChange={e => handleCellEdit(e, idx, 'on', dayIdx)}
-                            onBlur={e => handleCellBlur('on', e.target.value, idx)}
-                            autoFocus
-                            placeholder="HHMM"
-                            maxLength={4}
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                          />
-                        ) : (
-                          <div
-                            className="ctr-cell-content"
-                            onDoubleClick={!isTouchDevice ? () => handleCellDoubleClick(idx, 'on', dayIdx) : undefined}
-                            onClick={isTouchDevice ? () => handleCellDoubleClick(idx, 'on', dayIdx) : undefined}
-                          >
-                            {day.on}
-                          </div>
-                        )}
-                      </td>
-                      <td className="ctr-td time-col">
-                        {editingCell?.row === idx && editingCell?.field === 'off' && editingCell?.dayIdx === dayIdx ? (
-                          <input
-                            className="ctr-input ctr-off"
-                            value={day.off}
-                            onChange={e => handleCellEdit(e, idx, 'off', dayIdx)}
-                            onBlur={e => handleCellBlur('off', e.target.value, idx)}
-                            autoFocus
-                            placeholder="HHMM"
-                            maxLength={4}
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                          />
-                        ) : (
-                          <div
-                            className="ctr-cell-content"
-                            onDoubleClick={!isTouchDevice ? () => handleCellDoubleClick(idx, 'off', dayIdx) : undefined}
-                            onClick={isTouchDevice ? () => handleCellDoubleClick(idx, 'off', dayIdx) : undefined}
-                          >
-                            {day.off}
-                          </div>
-                        )}
-                      </td>
-                    </React.Fragment>
-                  ))}
-                  <td className="ctr-td">
-                    {data[idx] && (
-                      <button 
-                        className="ctr-btn" 
-                        style={{ background: '#d32f2f', padding: '2px 6px' }} 
-                        onClick={() => handleDelete(idx)}
-                      >
-                        ×
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Total Hours Display */}
-      <div className="ctr-total-hours">
-        <div className="ctr-total-label">Total Hours Worked:</div>
-        <div className="ctr-total-value">{totalHours.toFixed(2)}</div>
+          {/* Image Panel */}
+          <div className="image-mini-viewport" style={{ flex: 1, minWidth: 0, maxWidth: '100%', display: 'flex', flexDirection: 'column', height: 340, justifyContent: 'flex-start' }}>
+            <div className="image-mini-header">
+              <h4>Date Image</h4>
+            </div>
+            <div className="image-mini-container" onClick={imageUrl ? handleOpenImage : undefined} title={imageUrl ? 'Click to view/download image' : 'No image for this date'}>
+              {imageUrl ? (
+                <img src={imageUrl} alt="Date Entry" />
+              ) : (
+                <span style={{ color: '#aaa', fontSize: 16 }}>No image for this date</span>
+              )}
+            </div>
+            <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <label className="ctr-btn" style={{ cursor: 'pointer', fontSize: 14, marginBottom: 4 }}>
+                Take/Upload Image
+                <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleImageUpload} />
+              </label>
+              {imageUrl && (
+                <div style={{ textAlign: 'center', fontSize: 12, color: '#666' }}>
+                  Click image to view/download
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
       {showCalendar && (
