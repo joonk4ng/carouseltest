@@ -383,8 +383,13 @@ const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days, o
             const firstContentRow = `<tr><td style="text-align: left; padding-left: 0.5cm; height: 0.435cm;"><span style="display: inline-block; margin-right: 5.5cm;">${firstRowText}</span>Total Hours: ${formattedTotalHours}</td></tr>`;
             
             // Add checkbox-based remarks
-            if (crewInfo.checkboxStates?.noMealsLodging) remarks.push('Self Sufficient - No Meals Provided');
-            if (crewInfo.checkboxStates?.noMeals) remarks.push('Self Sufficient - No Meals & No Lodging Provided');
+            if (crewInfo.checkboxStates?.noMealsLodging && crewInfo.checkboxStates?.noMeals) {
+              remarks.push('Self Sufficient - No Meals & No Lodging Provided');
+            } else if (crewInfo.checkboxStates?.noMealsLodging) {
+              remarks.push('Self Sufficient - No Meals Provided');
+            } else if (crewInfo.checkboxStates?.noMeals) {
+              remarks.push('Self Sufficient - No Lodging Provided');
+            }
             if (crewInfo.checkboxStates?.travel && crewInfo.checkboxStates?.hotline) remarks.push('Travel');
             if (crewInfo.checkboxStates?.noLunch) remarks.push('No Lunch Taken due to Uncontrolled Fire Line');
 

@@ -24,11 +24,12 @@ export function mapToPDFFields(data: any[], crewInfo?: any, signature?: { name: 
       fields['lRfMARKSRow1'] = `${firstRowText}                Total Hours: ${formattedTotalHours}`;
       
       // Add remaining remarks with updated text
-      if (crewInfo.checkboxStates.noMealsLodging) {
-        remarks.push('Self Sufficient - No Meals Provided');
-      }
-      if (crewInfo.checkboxStates.noMeals) {
+      if (crewInfo.checkboxStates.noMealsLodging && crewInfo.checkboxStates.noMeals) {
         remarks.push('Self Sufficient - No Meals & No Lodging Provided');
+      } else if (crewInfo.checkboxStates.noMealsLodging) {
+        remarks.push('Self Sufficient - No Meals Provided');
+      } else if (crewInfo.checkboxStates.noMeals) {
+        remarks.push('Self Sufficient - No Lodging Provided');
       }
       if (crewInfo.checkboxStates.travel && crewInfo.checkboxStates.hotline) {
         remarks.push('Travel');
