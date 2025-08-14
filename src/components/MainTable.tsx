@@ -1527,10 +1527,36 @@ export default function MainTable() {
           throw new Error('No worksheet found in Excel file');
         }
 
-        const { crewMembers } = mapExcelToData(worksheet);
+        const { crewInfo, crewMembers } = mapExcelToData(worksheet);
+        
+        // Update crew information
+        setCrewInfo(crewInfo);
+        
+        // Update crew member data
         setData(crewMembers);
+        
+        // Update dates if they were extracted from the Excel file
+        if (crewMembers.length > 0 && crewMembers[0].days.length > 0) {
+          const extractedDates = [
+            crewMembers[0].days[0]?.date || '',
+            crewMembers[0].days[1]?.date || ''
+          ];
+          setDays(extractedDates);
+          
+          // Set selected date to the first date if available
+          if (extractedDates[0]) {
+            setSelectedDate(extractedDates[0]);
+          }
+        }
+        
         setHasUnsavedChanges(true);
         showNotification('Excel data imported successfully', 'success');
+        
+        console.log('Excel import completed:', {
+          crewInfo,
+          crewMembers: crewMembers.length,
+          dates: crewMembers.length > 0 ? crewMembers[0].days.map(d => d.date) : []
+        });
       } catch (error) {
         console.error('Error reading Excel file:', error);
         showNotification('Failed to import Excel data. Please check the file format.', 'error');

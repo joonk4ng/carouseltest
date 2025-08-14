@@ -2,7 +2,7 @@
   "name": "joonk4ng.github.io",
   "version": "0.1.0",
   "private": true,
-  "homepage": "https://joonk4ng.github.io",
+  "homepage": "https://jobs-prog-test.github.io",
   "scripts": {
     "dev": "vite --force",
     "dev:clean": "rimraf node_modules/.vite && vite --force",
@@ -11,7 +11,7 @@
     "start": "vite preview --host 0.0.0.0 --port 4173",
     "generate-icons": "node scripts/generate-icons.js",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist -r https://github.com/joonk4ng/joonk4ng.github.io.git"
+    "deploy": "gh-pages -d dist -r https://github.com/jobs-prog-test/jobs-prog-test.github.io.git"
   },
   "dependencies": {
     "@types/nodemailer": "^6.4.17",

@@ -3,18 +3,21 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - main  # Set a branch name to trigger deployment
+      - main
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -26,9 +29,8 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Deploy
+      - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
-          # Remove the publish_branch line to use default gh-pages branch

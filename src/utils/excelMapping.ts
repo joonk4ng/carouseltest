@@ -29,36 +29,51 @@ export const EXCEL_CELL_MAPPING = {
 function getMergedCellValue(worksheet: ExcelJS.Worksheet, cellAddress: string): string {
   const cell = worksheet.getCell(cellAddress);
   
-  // Debug logging
-  console.log(`Reading cell ${cellAddress}:`, {
+  // Enhanced debug logging
+  console.log(`🔍 Excel Import: Reading cell ${cellAddress}:`, {
     value: cell.value,
     type: cell.type,
     text: cell.text,
-    formula: cell.formula
+    formula: cell.formula,
+    address: cell.address,
+    row: cell.row,
+    col: cell.col
   });
 
   // Handle different types of cell values
   if (cell.value === null || cell.value === undefined) {
+    console.log(`🔍 Excel Import: Cell ${cellAddress} is empty`);
     return '';
   }
 
   // If the cell value is a rich text object
   if (cell.type === ExcelJS.ValueType.RichText) {
     const richTextValue = cell.value as ExcelJS.CellRichTextValue;
-    return richTextValue.richText.map(rt => rt.text).join('');
+    const result = richTextValue.richText.map(rt => rt.text).join('');
+    console.log(`🔍 Excel Import: Rich text cell ${cellAddress} = "${result}"`);
+    return result;
   }
 
   // For dates, return the formatted text
   if (cell.type === ExcelJS.ValueType.Date) {
-    return cell.text || '';
+    const result = cell.text || '';
+    console.log(`🔍 Excel Import: Date cell ${cellAddress} = "${result}"`);
+    return result;
   }
 
   // For all other types, convert to string
-  return cell.value?.toString() || '';
+  const result = cell.value?.toString() || '';
+  console.log(`🔍 Excel Import: Regular cell ${cellAddress} = "${result}"`);
+  return result;
 }
 
 export function mapExcelToData(worksheet: ExcelJS.Worksheet): { crewInfo: CrewInfo; crewMembers: CrewMember[] } {
-  console.log('Starting Excel import...');
+  console.log('🔍 Excel Import: Starting Excel import...');
+  console.log('🔍 Excel Import: Worksheet info:', {
+    name: worksheet.name,
+    rowCount: worksheet.rowCount,
+    columnCount: worksheet.columnCount
+  });
   
   // Extract crew info from specific cells
   const crewInfo: CrewInfo = {
@@ -68,13 +83,13 @@ export function mapExcelToData(worksheet: ExcelJS.Worksheet): { crewInfo: CrewIn
     fireNumber: getMergedCellValue(worksheet, EXCEL_CELL_MAPPING.crewInfo.fireNumber) || ''
   };
 
-  console.log('Extracted crew info:', crewInfo);
+  console.log('🔍 Excel Import: Extracted crew info:', crewInfo);
 
   // Extract dates from specific cells
   const date1 = getMergedCellValue(worksheet, EXCEL_CELL_MAPPING.dates.date1) || '';
   const date2 = getMergedCellValue(worksheet, EXCEL_CELL_MAPPING.dates.date2) || '';
 
-  console.log('Extracted dates:', { date1, date2 });
+  console.log('🔍 Excel Import: Extracted dates:', { date1, date2 });
 
   const crewMembers: CrewMember[] = [];
   let row = EXCEL_CELL_MAPPING.crewMembers.startRow;
