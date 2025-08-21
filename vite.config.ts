@@ -135,7 +135,13 @@ export default defineConfig({
         },
         // Ensure proper MIME types
         format: 'es'
-      }
+      },
+      // Add external dependencies to avoid bundling issues
+      external: [
+        '../internals/define-globalThis-property',
+        '../internals/globalThis-this',
+        /^\.\.\/internals\/.*$/
+      ]
     },
     // enables source map generation and debugs minified production code by mapping it back to source
     sourcemap: true,

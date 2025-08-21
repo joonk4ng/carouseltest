@@ -2,6 +2,8 @@
 import React from 'react';
 import { CrewMember, CrewInfo } from '../types/CTRTypes';
 import { calculateTotalHours } from '../utils/timeCalculations';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 // PrintableTableProps interface
 interface PrintableTableProps {
@@ -22,18 +24,80 @@ const formatDate = (dateStr: string): string => {
   return dateStr;
 };
 
-// Function to render the PrintableTable component
-const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days, onBeforePrint }) => {
-  const handlePrint = async () => {
-    if (onBeforePrint) {
-      await onBeforePrint();
-    }
-    // Open a new window with the print template
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
+// Generate PDF from HTML template for iOS compatibility
+const generatePDFFromTable = async (tableHTML: string): Promise<jsPDF> => {
+  // Create a temporary container with the table HTML
+  const tempContainer = document.createElement('div');
+  tempContainer.innerHTML = tableHTML;
+  tempContainer.style.position = 'absolute';
+  tempContainer.style.left = '-9999px';
+  tempContainer.style.top = '0';
+  tempContainer.style.width = '210mm'; // A4 width
+  tempContainer.style.backgroundColor = '#ffffff';
+  document.body.appendChild(tempContainer);
 
-    // HTML template - DO NOT CHANGE THIS TEMPLATE
-    const template = `<!DOCTYPE html>
+  try {
+    // Convert HTML to canvas with high quality
+    const canvas = await html2canvas(tempContainer, {
+      scale: 2, // Higher resolution for print quality
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
+      width: tempContainer.scrollWidth,
+      height: tempContainer.scrollHeight,
+      scrollX: 0,
+      scrollY: 0,
+      logging: false // Disable logging for production
+    });
+
+    // Create PDF with exact dimensions
+    const imgWidth = 210; // A4 width in mm
+    const pageHeight = 297; // A4 height in mm
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    
+    // Add margins to the PDF (matching the @page margins from the template)
+    const marginTop = 4.5; // 0.45cm in mm
+    const marginLeft = 3.5; // 0.35cm in mm
+    const marginRight = 3.5;
+    const marginBottom = 4.5;
+    
+    const contentWidth = imgWidth - marginLeft - marginRight;
+    const contentHeight = imgHeight;
+    
+    // Calculate how many pages we need
+    const pagesNeeded = Math.ceil(contentHeight / (pageHeight - marginTop - marginBottom));
+    
+    for (let i = 0; i < pagesNeeded; i++) {
+      if (i > 0) pdf.addPage();
+      
+      const sourceY = i * (pageHeight - marginTop - marginBottom) * (canvas.height / contentHeight);
+      const sourceHeight = Math.min(
+        (pageHeight - marginTop - marginBottom) * (canvas.height / contentHeight),
+        canvas.height - sourceY
+      );
+      
+      pdf.addImage(
+        canvas,
+        'PNG',
+        marginLeft,
+        marginTop,
+        contentWidth,
+        contentHeight
+      );
+    }
+
+    return pdf;
+  } finally {
+    document.body.removeChild(tempContainer);
+  }
+};
+
+// Generate the HTML template with data
+const generateTemplateHTML = (data: CrewMember[], crewInfo: CrewInfo, days: string[]): string => {
+  // HTML template - DO NOT CHANGE THIS TEMPLATE
+  const template = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -200,8 +264,8 @@ const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days, o
         </colgroup>
         <tr style="height: 0.435cm;">
             <td></td>
-            <td style="text-align: right;">Fire Name:</td>
-            <td style="text-align: right;">Fire Number:</td>
+            <td style="text-align: right;"></td>
+            <td style="text-align: right;"></td>
         </tr>
     </table>
 
@@ -282,6 +346,66 @@ const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days, o
     </table>
 </body>
 </html>`;
+
+  return template;
+};
+
+// Function to render the PrintableTable component
+const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days, onBeforePrint }) => {
+  const handlePrint = async () => {
+    if (onBeforePrint) {
+      await onBeforePrint();
+    }
+
+    // Detect iOS devices
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    
+    if (isIOS) {
+      // Use PDF generation for iOS devices
+      try {
+        console.log('iOS device detected - using PDF generation for printing');
+        
+        // Generate the template HTML first
+        const template = generateTemplateHTML(data, crewInfo, days);
+        
+        // Generate PDF from the template
+        const pdf = await generatePDFFromTable(template);
+        
+        // Save the PDF and open for printing
+        const pdfBlob = pdf.output('blob');
+        const url = URL.createObjectURL(pdfBlob);
+        
+        // Open PDF in new window for printing
+        const pdfWindow = window.open(url, '_blank');
+        if (pdfWindow) {
+          pdfWindow.onload = () => {
+            setTimeout(() => {
+              pdfWindow.print();
+              // Clean up URL after printing
+              setTimeout(() => {
+                URL.revokeObjectURL(url);
+              }, 1000);
+            }, 500);
+          };
+        } else {
+          // Fallback: trigger download
+          pdf.save('crew-time-report.pdf');
+        }
+        
+        return;
+      } catch (error) {
+        console.error('PDF generation failed:', error);
+        // Fall back to HTML printing
+        console.log('Falling back to HTML printing');
+      }
+    }
+
+    // Use existing HTML approach for non-iOS devices or fallback
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    // Generate the HTML template
+    const template = generateTemplateHTML(data, crewInfo, days);
 
     // Create a temporary div to parse the HTML
     const tempDiv = document.createElement('div');
@@ -379,7 +503,8 @@ const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days, o
             const formattedTotalHours = totalHours.toFixed(2);
 
             // First content row (actually second row) will be HOTLINE/Travel + Total Hours
-            const firstRowText = crewInfo.checkboxStates?.hotline ? 'HOTLINE' : 'Travel';
+            const firstRowText = crewInfo.checkboxStates?.hotline ? 'HOTLINE' : 
+                                (crewInfo.checkboxStates?.travel ? 'Travel' : '');
             const firstContentRow = `<tr><td style="text-align: left; padding-left: 0.5cm; height: 0.435cm;"><span style="display: inline-block; margin-right: 5.5cm;">${firstRowText}</span>Total Hours: ${formattedTotalHours}</td></tr>`;
             
             // Add checkbox-based remarks
@@ -418,49 +543,50 @@ const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days, o
           }
         }
 
-        // Write the modified content to the new window
+                // Write the modified content to the new window
         printWindow.document.write('<!DOCTYPE html>');
         printWindow.document.write(tempDiv.innerHTML);
         printWindow.document.close();
         
-        // Ensure the buttons are visible by adding them again if needed
-        setTimeout(() => {
-          if (printWindow.document.body) {
-            // Check if buttons exist, if not add them
-            let backBtn = printWindow.document.querySelector('.back-btn') as HTMLButtonElement | null;
-            let printBtn = printWindow.document.querySelector('.print-btn') as HTMLButtonElement | null;
-            
-            if (!backBtn) {
-              backBtn = printWindow.document.createElement('button') as HTMLButtonElement;
-              backBtn.className = 'back-btn';
-              backBtn.onclick = () => printWindow.close();
-              backBtn.textContent = '← Back';
-              printWindow.document.body.appendChild(backBtn);
-            }
-            
-            if (!printBtn) {
-              printBtn = printWindow.document.createElement('button') as HTMLButtonElement;
-              printBtn.className = 'print-btn';
-              printBtn.onclick = () => printWindow.print();
-              printBtn.textContent = '🖨️ Print';
-              printWindow.document.body.appendChild(printBtn);
-            }
-          }
-        }, 200);
-
-        // Print the window after ensuring content is loaded
-        printWindow.onload = () => {
-          setTimeout(() => {
-            printWindow.print();
-            // Close the window after printing (optional)
-            // printWindow.close();
-          }, 500);
-        };
       } catch (error) {
         console.error('Error updating template:', error);
         printWindow.close();
       }
     }, 100); // Small delay to ensure DOM is parsed
+        
+    // Ensure the buttons are visible by adding them again if needed
+    setTimeout(() => {
+      if (printWindow.document.body) {
+        // Check if buttons exist, if not add them
+        let backBtn = printWindow.document.querySelector('.back-btn') as HTMLButtonElement | null;
+        let printBtn = printWindow.document.querySelector('.print-btn') as HTMLButtonElement | null;
+        
+        if (!backBtn) {
+          backBtn = printWindow.document.createElement('button') as HTMLButtonElement;
+          backBtn.className = 'back-btn';
+          backBtn.onclick = () => printWindow.close();
+          backBtn.textContent = '← Back';
+          printWindow.document.body.appendChild(backBtn);
+        }
+        
+        if (!printBtn) {
+          printBtn = printWindow.document.createElement('button') as HTMLButtonElement;
+          printBtn.className = 'print-btn';
+          printBtn.onclick = () => printWindow.print();
+          printBtn.textContent = '🖨️ Print';
+          printWindow.document.body.appendChild(printBtn);
+        }
+      }
+    }, 200);
+
+    // Print the window after ensuring content is loaded
+    printWindow.onload = () => {
+      setTimeout(() => {
+        printWindow.print();
+        // Close the window after printing (optional)
+        // printWindow.close();
+      }, 500);
+    };
   };
 
   return (
