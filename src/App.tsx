@@ -1,4 +1,3 @@
-import React from 'react';
 import MainTable from './components/MainTable';
 import { DatabaseInitializer } from './components/DatabaseInitializer';
 import './App.css';

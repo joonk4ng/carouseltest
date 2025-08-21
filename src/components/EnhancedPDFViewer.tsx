@@ -1,9 +1,16 @@
-// React component for the enhanced PDF viewer with signature integration
+// React component for the enhanced PDF viewer with signature integration and PDF flattening
+// 
+// Features:
+// - Loads and displays PDF documents
+// - Allows users to draw signatures on a transparent overlay
+// - Flattens the entire PDF (including signature) into a single image layer
+// - Prevents modification of signatures and form fields after saving
+// - Creates a new PDF with flattened content for secure document storage
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { getPDF } from '../utils/pdfStorage';
 import '../styles/EnhancedPDFViewer.css';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, rgb } from 'pdf-lib';
 import { generateExportFilename } from '../utils/filenameGenerator';
 
 // Configure PDF.js worker
@@ -74,6 +81,89 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
   const isChrome = /Chrome/.test(navigator.userAgent);
   const isChromeIOS = isIOS && isChrome;
 
+  // Helper function to flatten PDF content to image
+  const flattenPDFToImage = useCallback(async (pdfDoc: pdfjsLib.PDFDocumentProxy): Promise<Blob> => {
+    if (!canvasRef.current) {
+      throw new Error('Canvas not available for flattening');
+    }
+
+    const page = await pdfDoc.getPage(1);
+    const viewport = page.getViewport({ scale: 3.0 }); // Higher scale for better quality
+    
+    // Create a temporary canvas for flattening
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = viewport.width;
+    tempCanvas.height = viewport.height;
+    const tempCtx = tempCanvas.getContext('2d');
+    
+    if (!tempCtx) {
+      throw new Error('Could not get canvas context for flattening');
+    }
+
+    // Fill with white background
+    tempCtx.fillStyle = 'white';
+    tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+    // Render PDF page to the temporary canvas
+    await page.render({
+      canvasContext: tempCtx,
+      viewport: viewport
+    }).promise;
+
+    // Convert canvas to blob with high quality
+    return new Promise<Blob>((resolve, reject) => {
+      tempCanvas.toBlob((blob) => {
+        if (blob) {
+          console.log('🔍 EnhancedPDFViewer: PDF flattened to image, size:', blob.size, 'bytes');
+          resolve(blob);
+        } else {
+          reject(new Error('Failed to convert canvas to blob'));
+        }
+      }, 'image/png', 1.0);
+    });
+  }, []);
+
+  // Helper function to create flattened PDF from images
+  const createFlattenedPDF = useCallback(async (
+    pdfImageBlob: Blob, 
+    signatureImageBlob: Blob | null
+  ): Promise<Uint8Array> => {
+    // Create a new PDF document
+    const pdfDoc = await PDFDocument.create();
+    
+    // Convert image blobs to Uint8Array
+    const pdfImageBytes = new Uint8Array(await pdfImageBlob.arrayBuffer());
+    const pdfImage = await pdfDoc.embedPng(pdfImageBytes);
+    
+    // Create a page with the same dimensions as the PDF image
+    const page = pdfDoc.addPage([pdfImage.width, pdfImage.height]);
+    
+    // Draw the flattened PDF image
+    page.drawImage(pdfImage, {
+      x: 0,
+      y: 0,
+      width: pdfImage.width,
+      height: pdfImage.height,
+    });
+
+    // If there's a signature, overlay it
+    if (signatureImageBlob) {
+      const signatureImageBytes = new Uint8Array(await signatureImageBlob.arrayBuffer());
+      const signatureImage = await pdfDoc.embedPng(signatureImageBytes);
+      
+      // Scale signature to match page dimensions
+      page.drawImage(signatureImage, {
+        x: 0,
+        y: 0,
+        width: pdfImage.width,
+        height: pdfImage.height,
+      });
+    }
+
+    // Save the flattened PDF
+    return await pdfDoc.save();
+  }, []);
+
   // Log platform info for debugging
   useEffect(() => {
     console.log('🔍 EnhancedPDFViewer: Platform Info:', {
@@ -88,6 +178,7 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
     }
   }, [isIOS, isChrome, isChromeIOS]);
 
+  // PDF rendering
   const renderPDF = useCallback(async (pdfDoc: pdfjsLib.PDFDocumentProxy) => {
     if (!canvasRef.current || !drawCanvasRef.current) return;
 
@@ -163,6 +254,7 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
       }
     };
 
+    // Add touch event listeners with passive: false
     container.addEventListener('touchstart', preventDefault, options);
     container.addEventListener('touchmove', preventDefault, options);
     container.addEventListener('touchend', preventDefault, options);
@@ -174,6 +266,7 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
     };
   }, [isDrawingMode]);
 
+  // get the touch position for the draw canvas
   const getTouchPos = (e: React.TouchEvent<HTMLCanvasElement>) => {
     if (!drawCanvasRef.current) return { x: 0, y: 0 };
     const touch = e.touches[0];
@@ -223,9 +316,11 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
       };
     }
 
+    // get the context for the draw canvas
     const ctx = drawCanvasRef.current.getContext('2d');
     if (!ctx) return;
 
+    // begin the path
     ctx.beginPath();
     ctx.strokeStyle = '#000000'; // Default black color
     ctx.lineWidth = 2; // Default line width
@@ -253,17 +348,19 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   };
 
-  // Handles the saving of the PDF with the signature
+  // Handles the saving of the PDF with the signature (flattened)
   const handleSave = async () => {
     setIsDrawingMode(false);
     if (!canvasRef.current || !drawCanvasRef.current || !onSave || !pdfDocRef.current) return;
 
     try {
+      console.log('🔍 EnhancedPDFViewer: Starting PDF flattening process...');
+
       // Get both canvases
       const baseCanvas = canvasRef.current;
       const drawCanvas = drawCanvasRef.current;
 
-      // Create a temporary canvas to combine both layers
+      // Create a temporary canvas to combine both layers for preview
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = baseCanvas.width;
       tempCanvas.height = baseCanvas.height;
@@ -283,173 +380,63 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
         }, 'image/png');
       });
 
-      // Get the drawing canvas content as a PNG for annotations
-      const annotationImage = await new Promise<Blob>((resolve) => {
-        drawCanvas.toBlob((blob) => {
-          resolve(blob!);
-        }, 'image/png');
-      });
+      // Check if there's a signature to flatten by checking if the canvas has any non-transparent pixels
+      const drawCtx = drawCanvas.getContext('2d');
+      let hasSignature = false;
+      let signatureImageBlob: Blob | null = null;
 
-      // Convert the original PDF to Uint8Array
-      const pdfBytes = await pdfDocRef.current.getData();
-      
-      // Debug: Check the original PDF content before processing
-      console.log('🔍 EnhancedPDFViewer: Original PDF bytes length:', pdfBytes.length);
-      
-      // Load the PDF with pdf-lib
-      const pdfDoc = await PDFDocument.load(pdfBytes);
-      const pages = pdfDoc.getPages();
-      const firstPage = pages[0];
-
-      // Debug: Check if the PDF has form fields and their content
-      let originalFieldValues: Record<string, string> = {};
-      try {
-        const form = pdfDoc.getForm();
-        const fields = form.getFields();
-        console.log('🔍 EnhancedPDFViewer: PDF form fields after loading:', fields.map(f => f.getName()));
-        
-        // Store original field values to preserve them
-        fields.forEach(field => {
-          if (field.getName().includes('CATION')) {
-            const textField = form.getTextField(field.getName());
-            const fieldValue = textField.getText();
-            originalFieldValues[field.getName()] = fieldValue || '';
-            console.log(`🔍 EnhancedPDFViewer: Classification field ${field.getName()} = "${fieldValue || ''}" (length: ${fieldValue?.length || 0})`);
-          }
-        });
-      } catch (e) {
-        console.log('🔍 EnhancedPDFViewer: No form fields found or error accessing them:', e);
-      }
-
-      // Convert PNG blob to Uint8Array
-      const annotationBytes = new Uint8Array(await annotationImage.arrayBuffer());
-      
-      // Embed the PNG image
-      const annotationPngImage = await pdfDoc.embedPng(annotationBytes);
-      
-      // Get page dimensions
-      const { width, height } = firstPage.getSize();
-      
-      // Draw the annotation image on top of the PDF
-      firstPage.drawImage(annotationPngImage, {
-        x: 0,
-        y: 0,
-        width,
-        height,
-        opacity: 1,
-      });
-
-      // Debug: Check form fields after adding annotation
-      try {
-        const form = pdfDoc.getForm();
-        const fields = form.getFields();
-        
-        // Restore original field values to prevent truncation
-        Object.entries(originalFieldValues).forEach(([fieldName, originalValue]) => {
-          try {
-            const textField = form.getTextField(fieldName);
-            const currentValue = textField.getText();
-            if (currentValue !== originalValue) {
-              console.log(`🔍 EnhancedPDFViewer: Restoring field ${fieldName} from "${currentValue}" to "${originalValue}"`);
-              textField.setText(originalValue);
-            }
-          } catch (e) {
-            console.log(`🔍 EnhancedPDFViewer: Error restoring field ${fieldName}:`, e);
-          }
-        });
-        
-        fields.forEach(field => {
-          if (field.getName().includes('CATION')) {
-            const textField = form.getTextField(field.getName());
-            const fieldValue = textField.getText();
-            console.log(`🔍 EnhancedPDFViewer: Classification field ${field.getName()} after annotation = "${fieldValue || ''}" (length: ${fieldValue?.length || 0})`);
-          }
-        });
-      } catch (e) {
-        console.log('🔍 EnhancedPDFViewer: Error checking fields after annotation:', e);
-      }
-
-      // iOS WebKit specific handling - preserve field values before final save
-      if (isIOS) {
-        console.log('🔍 EnhancedPDFViewer: iOS WebKit - preserving field values before final save');
-        
+      if (drawCtx) {
         try {
-          // Get the form from the PDF document
-          const form = pdfDoc.getForm();
+          const imageData = drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height);
+          const data = imageData.data;
           
-          // Restore all original field values one more time before saving
-          Object.entries(originalFieldValues).forEach(([fieldName, originalValue]) => {
-            try {
-              const textField = form.getTextField(fieldName);
-              const currentValue = textField.getText();
-              if (currentValue !== originalValue) {
-                console.log(`🔍 EnhancedPDFViewer: iOS WebKit - final restore of field ${fieldName} from "${currentValue}" to "${originalValue}"`);
-                textField.setText(originalValue);
-              }
-            } catch (e) {
-              console.log(`🔍 EnhancedPDFViewer: iOS WebKit - error in final restore of field ${fieldName}:`, e);
+          // Check if there are any non-transparent pixels (alpha > 0)
+          for (let i = 3; i < data.length; i += 4) {
+            if (data[i] > 0) {
+              hasSignature = true;
+              break;
             }
-          });
+          }
         } catch (e) {
-          console.log('🔍 EnhancedPDFViewer: iOS WebKit - error in final field preservation:', e);
+          console.log('🔍 EnhancedPDFViewer: Error checking signature pixels, assuming no signature:', e);
+          hasSignature = false;
         }
       }
 
-      // Save the PDF
-      const modifiedPdfBytes = await pdfDoc.save();
-      const modifiedPdfBlob = new Blob([modifiedPdfBytes], { type: 'application/pdf' });
-      
-      console.log('🔍 EnhancedPDFViewer: Modified PDF bytes length:', modifiedPdfBytes.length);
-      
-      // iOS WebKit specific verification after final save
-      if (isIOS) {
-        console.log('🔍 EnhancedPDFViewer: iOS WebKit - verifying final PDF content before download');
-        
-        try {
-          // Load the final PDF and verify classification fields
-          const finalPdfDoc = await PDFDocument.load(modifiedPdfBytes);
-          const finalForm = finalPdfDoc.getForm();
-          const finalFields = finalForm.getFields();
-          
-          let finalVerificationPassed = true;
-          finalFields.forEach(field => {
-            if (field.getName().includes('CATION')) {
-              const textField = finalForm.getTextField(field.getName());
-              const fieldValue = textField.getText();
-              console.log(`🔍 EnhancedPDFViewer: iOS WebKit final verification - ${field.getName()} = "${fieldValue || ''}" (length: ${fieldValue?.length || 0})`);
-              
-              // Check if this field should have data (first two rows)
-              const rowNum = field.getName().match(/Row(\d+)/)?.[1];
-              if (rowNum && (rowNum === '1' || rowNum === '2')) {
-                // Get the original data from the crew info or stored data
-                const expectedData = originalFieldValues[field.getName()];
-                if (expectedData && fieldValue !== expectedData) {
-                  console.warn(`🔍 EnhancedPDFViewer: iOS WebKit final verification FAILED - ${field.getName()} expected "${expectedData}" but got "${fieldValue}"`);
-                  finalVerificationPassed = false;
-                }
-              }
-            }
-          });
-          
-          if (finalVerificationPassed) {
-            console.log('🔍 EnhancedPDFViewer: iOS WebKit final verification PASSED');
-          } else {
-            console.warn('🔍 EnhancedPDFViewer: iOS WebKit final verification FAILED - some fields were truncated during final save');
-          }
-        } catch (e) {
-          console.log('🔍 EnhancedPDFViewer: iOS WebKit final verification error:', e);
-        }
+      if (hasSignature) {
+        // Get the signature canvas content as a PNG
+        signatureImageBlob = await new Promise<Blob>((resolve) => {
+          drawCanvas.toBlob((blob) => {
+            resolve(blob!);
+          }, 'image/png');
+        });
+        console.log('🔍 EnhancedPDFViewer: Signature detected, will be flattened');
+      } else {
+        console.log('🔍 EnhancedPDFViewer: No signature detected, flattening PDF only');
       }
 
-      // Set the signed state and store the signed PDF blob
+      // Flatten the PDF to an image
+      console.log('🔍 EnhancedPDFViewer: Flattening PDF content to image...');
+      const flattenedPdfImage = await flattenPDFToImage(pdfDocRef.current);
+
+      // Create the flattened PDF
+      console.log('🔍 EnhancedPDFViewer: Creating flattened PDF...');
+      const flattenedPdfBytes = await createFlattenedPDF(flattenedPdfImage, signatureImageBlob);
+      const flattenedPdfBlob = new Blob([flattenedPdfBytes], { type: 'application/pdf' });
+      
+      console.log('🔍 EnhancedPDFViewer: Flattened PDF created successfully');
+      console.log('🔍 EnhancedPDFViewer: Flattened PDF bytes length:', flattenedPdfBytes.length);
+      console.log('🔍 EnhancedPDFViewer: Flattened PDF blob size:', flattenedPdfBlob.size, 'bytes');
+
+      // Set the signed state and store the flattened PDF blob
       setIsSigned(true);
-      setSignedPdfBlob(modifiedPdfBlob);
+      setSignedPdfBlob(flattenedPdfBlob);
       
-      // Save the PDF
-      onSave(modifiedPdfBlob, previewImage);
+      // Save the flattened PDF
+      onSave(flattenedPdfBlob, previewImage);
 
-      // Create a URL for the PDF blob and trigger download
-      const url = URL.createObjectURL(modifiedPdfBlob);
+      // Create a URL for the flattened PDF blob and trigger download
+      const url = URL.createObjectURL(flattenedPdfBlob);
       const link = document.createElement('a');
       link.href = url;
       
@@ -463,11 +450,10 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
           type: 'PDF'
         });
       } else {
-        link.download = 'signed_document.pdf';
+        link.download = 'signed_document_flattened.pdf';
       }
       
-      console.log('🔍 EnhancedPDFViewer: Downloading PDF with filename:', link.download);
-      console.log('🔍 EnhancedPDFViewer: PDF blob size:', modifiedPdfBlob.size, 'bytes');
+      console.log('🔍 EnhancedPDFViewer: Downloading flattened PDF with filename:', link.download);
       
       // Trigger the download
       document.body.appendChild(link);
@@ -478,8 +464,8 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
       URL.revokeObjectURL(url);
 
     } catch (err) {
-      console.error('Error saving PDF:', err);
-      setError('Failed to save PDF with annotations.');
+      console.error('Error saving flattened PDF:', err);
+      setError('Failed to save flattened PDF with signature.');
     }
   };
 
@@ -739,11 +725,11 @@ const EnhancedPDFViewer: React.FC<EnhancedPDFViewerProps> = ({
                 </svg>
                 Sign
               </button>
-              <button onClick={handleSave} className="save-btn" title="Finished">
+              <button onClick={handleSave} className="save-btn" title="Save Flattened PDF">
                 <svg viewBox="0 0 24 24" width="24" height="24">
                   <path fill="currentColor" d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/>
                 </svg>
-                Finished
+                Save
               </button>
               <button onClick={clearDrawing} className="clear-btn" title="Undo">
                 <svg viewBox="0 0 24 24" width="24" height="24">
