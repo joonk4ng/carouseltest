@@ -1,3 +1,4 @@
+// process type declaration
 declare global {
   interface Window {
     process: {

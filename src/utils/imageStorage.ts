@@ -1,3 +1,4 @@
+// file for image storage from camera
 import { openDB } from 'idb';
 
 // set database name

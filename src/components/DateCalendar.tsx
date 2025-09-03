@@ -55,14 +55,17 @@ export const DateCalendar: React.FC<DateCalendarProps> = ({ savedDates, onDateSe
     setCalendarDays(days);
   }, [currentDate]);
 
+  // handle the previous month
   const handlePrevMonth = () => {
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
   };
 
+  // handle the next month
   const handleNextMonth = () => {
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
   };
 
+  // handle the date click
   const handleDateClick = (date: Date) => {
     setSelectedDate(date);
     // Find if there's a saved date range that includes this date
@@ -72,12 +75,14 @@ export const DateCalendar: React.FC<DateCalendarProps> = ({ savedDates, onDateSe
       return dateStr >= start && dateStr <= end;
     });
     
+    // if there is a matching date range, select the date and close the calendar
     if (matchingDateRange) {
       onDateSelect(matchingDateRange);
       onClose();
     }
   };
 
+  // check if the date is saved
   const isDateSaved = (date: Date) => {
     const dateStr = date.toISOString().split('T')[0];
     return savedDates.some(range => {
@@ -86,6 +91,7 @@ export const DateCalendar: React.FC<DateCalendarProps> = ({ savedDates, onDateSe
     });
   };
 
+  // check if the date is in the current month
   const isCurrentMonth = (date: Date) => {
     return date.getMonth() === currentDate.getMonth();
   };

@@ -1,17 +1,21 @@
-import React, { useEffect, useState } from 'react';
+// file for the auto save status
+import { useEffect, useState } from 'react';
 import '../styles/AutoSaveStatus.css';
 
+// initialize object for auto save status props
 interface AutoSaveStatusProps {
   dateRange: string | null;
   isSaving: boolean;
   lastSaved: number | null;
 }
 
+// auto save status component
 export function AutoSaveStatus({ 
   dateRange, 
   isSaving, 
   lastSaved
 }: AutoSaveStatusProps) {
+  // initialize the visible state
   const [visible, setVisible] = useState(true);
 
   // Hide the status after 3 seconds when saved
@@ -25,10 +29,13 @@ export function AutoSaveStatus({
     setVisible(true);
   }, [isSaving, lastSaved]);
 
+  // if the status is not visible and not saving, return null
   if (!visible && !isSaving) return null;
 
+  // set the status class
   const statusClass = isSaving ? 'saving' : 'saved';
 
+  // return the auto save status component
   return (
     <div className={`auto-save-status ${statusClass}`}>
       <div className="auto-save-status-content">

@@ -1,3 +1,4 @@
+// file for the signature page
 import React from 'react';
 import { SignatureCanvas } from './SignatureCanvas';
 import '../styles/components/SignaturePage.css';
@@ -7,7 +8,9 @@ interface SignaturePageProps {
   onCancel: () => void;
 }
 
+// signature page component
 const SignaturePage: React.FC<SignaturePageProps> = ({ onSave, onCancel }) => {
+  // handle save
   const handleSave = (signatureData: string) => {
     console.log('SignaturePage: Saving signature...'); // Debug log
     onSave(signatureData);

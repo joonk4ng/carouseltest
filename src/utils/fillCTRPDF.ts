@@ -1,4 +1,5 @@
-// Add type declaration at the top of the file
+// file for filling the CTR PDF
+// Type declaration for the import meta
 declare global {
   interface ImportMeta {
     env: {
@@ -10,11 +11,13 @@ declare global {
   }
 }
 
+// imports for the fillCTRPDF function
 import { PDFDocument } from 'pdf-lib';
 import { mapToPDFFields } from './pdfFieldMapper';
 import { generateExportFilename } from './filenameGenerator';
 import { storePDF } from './pdfStorage';
 
+// initialize object for PDF generation options
 interface PDFGenerationOptions {
   downloadImmediately?: boolean;
   returnBlob?: boolean;

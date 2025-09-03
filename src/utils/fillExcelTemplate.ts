@@ -1,6 +1,8 @@
+// utility file for filling excel template based on mapping
 import ExcelJS from 'exceljs';
 import { CrewMember, CrewInfo } from '../types/CTRTypes';
 
+// initialize object for excel template mapping
 interface TemplateMapping {
   // Header Information
   crewName?: string;      // Cell for crew name
@@ -48,6 +50,7 @@ const CTR_TEMPLATE_MAPPING: TemplateMapping = {
   totalHoursCol: 'C'     // Total hours in column C
 };
 
+// set column widths
 function setColumnWidths(worksheet: ExcelJS.Worksheet) {
   // Log current column properties
   console.log('Current column properties:', worksheet.columns.map(col => ({
@@ -116,6 +119,7 @@ function formatDateWithTwoDigitYear(dateStr: string): string {
   return dateStr;
 }
 
+// fill the excel template
 export async function fillExcelTemplate(
   data: CrewMember[],
   crewInfo: CrewInfo,
@@ -257,6 +261,7 @@ export async function fillExcelTemplate(
   }
 }
 
+// calculate total hours
 function calculateTotalHours(data: CrewMember[]): number {
   if (!Array.isArray(data)) return 0;
   
@@ -276,6 +281,7 @@ function calculateTotalHours(data: CrewMember[]): number {
   return Number(total.toFixed(2));
 }
 
+// parse military time
 function parseMilitaryTime(time: string): number | null {
   if (!/^\d{4}$/.test(time)) return null;
   const h = parseInt(time.slice(0, 2), 10);

@@ -1,3 +1,4 @@
+// file for accessibility mode toggle
 import React, { useEffect, useState, useCallback } from 'react';
 import '../styles/ThemeToggle.css';
 
@@ -43,6 +44,7 @@ export const ThemeToggle: React.FC = () => {
         document.querySelector('.ctr-container')
       ];
 
+      // apply the theme to the main containers
       mainContainers.forEach(container => {
         if (container) {
           container.setAttribute('data-theme', newTheme);

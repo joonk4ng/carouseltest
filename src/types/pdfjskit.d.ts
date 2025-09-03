@@ -1,3 +1,4 @@
+// pdfjskit type declaration
 declare module 'pdfjskit' {
   interface PdfViewerOptions {
     documentUrl: string;
@@ -26,11 +27,13 @@ declare module 'pdfjskit' {
     };
   }
 
+  // pdf viewer class
   class PdfViewer {
     constructor(options: PdfViewerOptions);
     render(container: HTMLElement): void;
     destroy(): void;
   }
 
+  // export the pdf viewer
   export default PdfViewer;
 } 

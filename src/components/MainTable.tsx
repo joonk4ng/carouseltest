@@ -17,16 +17,14 @@ import PDFPreviewViewer from './PDFPreviewViewer';
 import PDFViewer from './PDFViewer';
 import { storePDF, listPDFs, getPDF } from '../utils/pdfStorage';
 import ExcelJS from 'exceljs';
-import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
-import type { Workbook } from 'xlsx-populate';
-import XLSX from 'xlsx';
+
 import PrintableTable from './PrintableTable';
 import '../styles/components/PrintableTable.css';
 import { AutoSaveStatus } from './AutoSaveStatus';
 import '../styles/AutoSaveStatus.css';
 import { ThemeToggle } from './ThemeToggle';
 import { storeImage, getImage, ImageData } from '../utils/imageStorage';
-import { parseCrewParams, hasCrewParams, clearUrlParams, validateCrewParams, decodeUrlParam, parseCrewData } from '../utils/urlParams';
+import { parseCrewParams, hasCrewParams, clearUrlParams, validateCrewParams, decodeUrlParam, parseCrewData, isDateRange, convertSingleDateToRange } from '../utils/urlParams';
 
 
 
@@ -100,6 +98,7 @@ const isTouchDevice = typeof window !== 'undefined' && ('ontouchstart' in window
 export default function MainTable() {
   const [data, setData] = useState<CrewMember[]>([]);
   
+  // no longer needed
   const [dayCount, setDayCount] = useState(2);
   
   const [days, setDays] = useState<string[]>(['', '']);
@@ -796,13 +795,22 @@ export default function MainTable() {
           // If a date is provided, select it
           if (crewParams.date) {
             const decodedDate = decodeUrlParam(crewParams.date);
-            await handleDateSelect(decodedDate);
+            
+            // Check if it's a single date or date range
+            if (isDateRange(decodedDate)) {
+              // It's already a date range, use as is
+              await handleDateSelect(decodedDate);
+            } else {
+              // It's a single date, convert to date range
+              const dateRange = convertSingleDateToRange(decodedDate);
+              await handleDateSelect(dateRange);
+            }
             showNotification('Crew information loaded from URL parameters', 'success');
           } else {
-      // If there are date ranges, select the first one
-      if (dateRanges.length > 0) {
-        const firstDateRange = dateRanges[0];
-        await handleDateSelect(firstDateRange);
+            // If there are date ranges, select the first one
+            if (dateRanges.length > 0) {
+              const firstDateRange = dateRanges[0];
+              await handleDateSelect(firstDateRange);
             }
           }
           
@@ -1802,7 +1810,7 @@ export default function MainTable() {
               onClick={() => setShowCalendar(true)}
               title="Open Calendar View"
             >
-              📅 Select Date
+              📅 Calendar
             </button>
             <div className="ctr-current-date">
               {selectedDate ? (

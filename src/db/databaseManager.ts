@@ -34,7 +34,7 @@ class CTRDatabase extends Dexie {
   }
 }
 
-// Simplified Database Manager
+// Simplified Database Manager class
 class DatabaseManager {
   private static instance: DatabaseManager;
   private db: CTRDatabase | null = null;
@@ -42,6 +42,7 @@ class DatabaseManager {
 
   private constructor() {}
 
+  // get the instance of the database manager
   static getInstance(): DatabaseManager {
     if (!DatabaseManager.instance) {
       DatabaseManager.instance = new DatabaseManager();
@@ -49,6 +50,7 @@ class DatabaseManager {
     return DatabaseManager.instance;
   }
 
+  // initialize the database
   private async initialize(): Promise<void> {
     if (!this.db) {
       this.db = new CTRDatabase();
@@ -56,6 +58,7 @@ class DatabaseManager {
     }
   }
 
+  // get the database
   async getDatabase(): Promise<CTRDatabase> {
     if (!this.initPromise) {
       this.initPromise = this.initialize();
@@ -69,6 +72,7 @@ class DatabaseManager {
     return this.db;
   }
 
+  // close the database
   async closeDatabase(): Promise<void> {
     if (this.db) {
       await this.db.close();
@@ -77,6 +81,7 @@ class DatabaseManager {
     }
   }
 
+  // check if the database is ready
   async isReady(): Promise<boolean> {
     try {
       const db = await this.getDatabase();

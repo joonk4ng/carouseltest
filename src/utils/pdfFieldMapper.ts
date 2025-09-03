@@ -20,8 +20,9 @@ export function mapToPDFFields(data: any[], crewInfo?: any, signature?: { name: 
       const formattedTotalHours = totalHours.toFixed(2);
 
       // First row: HOTLINE/Travel + Total Hours
-      const firstRowText = crewInfo.checkboxStates?.hotline ? 'HOTLINE' : 'Travel';
-      fields['lRfMARKSRow1'] = `${firstRowText}                Total Hours: ${formattedTotalHours}`;
+      const firstRowText = crewInfo.checkboxStates?.hotline ? 'HOTLINE' : 
+                          (crewInfo.checkboxStates?.travel ? 'Travel' : '');
+      fields['lRfMARKSRow1'] = firstRowText ? `${firstRowText}                Total Hours: ${formattedTotalHours}` : `Total Hours: ${formattedTotalHours}`;
       
       // Add remaining remarks with updated text
       if (crewInfo.checkboxStates.noMealsLodging && crewInfo.checkboxStates.noMeals) {

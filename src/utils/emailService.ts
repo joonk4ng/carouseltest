@@ -1,3 +1,4 @@
+// WIP file for the email service
 import nodemailer from 'nodemailer';
 import { PDFDocument } from 'pdf-lib';
 
@@ -24,6 +25,7 @@ interface EmailOptions {
   attachments?: EmailAttachment[];
 }
 
+// Email service class
 class EmailService {
   private transporter: nodemailer.Transporter;
   private static instance: EmailService;
@@ -32,6 +34,7 @@ class EmailService {
     this.transporter = nodemailer.createTransport(config);
   }
 
+  // get the instance of the email service
   public static getInstance(config?: EmailConfig): EmailService {
     if (!EmailService.instance && config) {
       EmailService.instance = new EmailService(config);
@@ -39,6 +42,7 @@ class EmailService {
     return EmailService.instance;
   }
 
+  // send an email
   public async sendEmail(options: EmailOptions): Promise<boolean> {
     try {
       await this.transporter.sendMail({
@@ -52,6 +56,7 @@ class EmailService {
     }
   }
 
+  // send a pdf email
   public async sendPdfEmail(
     to: string,
     subject: string,

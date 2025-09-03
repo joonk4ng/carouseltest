@@ -87,6 +87,7 @@ export const SignatureCanvas: React.FC<SignatureCanvasProps> = ({
     }
   }, [lineColor, lineWidth, showGuideLine]);
 
+  // draw the guide line
   const drawGuideLine = (context: CanvasRenderingContext2D) => {
     const { width, height } = context.canvas;
     context.beginPath();
@@ -97,6 +98,7 @@ export const SignatureCanvas: React.FC<SignatureCanvasProps> = ({
     context.stroke();
   };
 
+  // get the touch coordinates
   const getTouchCoordinates = (e: TouchEvent): Point => {
     const touch = e.touches[0];
     const rect = canvasRef.current!.getBoundingClientRect();
@@ -109,6 +111,7 @@ export const SignatureCanvas: React.FC<SignatureCanvasProps> = ({
     };
   };
 
+  // handle start drawing
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const point = 'touches' in e ? getTouchCoordinates(e as unknown as TouchEvent) : {
       x: e.nativeEvent.offsetX,
@@ -145,6 +148,7 @@ export const SignatureCanvas: React.FC<SignatureCanvasProps> = ({
     setLastPoint(null);
   };
 
+  // clear the canvas
   const clearCanvas = () => {
     const canvas = canvasRef.current;
     const context = contextRef.current;
@@ -158,6 +162,7 @@ export const SignatureCanvas: React.FC<SignatureCanvasProps> = ({
     setHasSignature(false);
   };
 
+  // save the signature
   const saveSignature = () => {
     if (!canvasRef.current || !hasSignature) return;
     
@@ -181,6 +186,7 @@ export const SignatureCanvas: React.FC<SignatureCanvasProps> = ({
     }
   };
 
+  // handle action select
   const handleActionSelect = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const action = event.target.value;
     switch (action) {

@@ -1,3 +1,4 @@
+// Coordinates the save process
 import { stableCTRService } from '../db/stableDexieService';
 import { CrewMember, CrewInfo } from '../types/CTRTypes';
 import { databaseManager } from '../db/databaseManager';
@@ -26,6 +27,7 @@ class SaveCoordinator {
     }
   }
 
+  // save the record
   async saveRecord(options: SaveOptions): Promise<void> {
     const { dateRange, data, crewInfo, onProgress, onComplete, onError } = options;
 
@@ -83,6 +85,7 @@ class SaveCoordinator {
     }
   }
 
+  // process the queue
   private async processQueue(): Promise<void> {
     if (this.saveQueue.length === 0) return;
 
@@ -92,6 +95,7 @@ class SaveCoordinator {
     }
   }
 
+  // check if a save is in progress
   isSaveInProgress(): boolean {
     return this.saveInProgress;
   }

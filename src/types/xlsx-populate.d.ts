@@ -1,3 +1,4 @@
+// xlsx-populate type declaration
 declare module 'xlsx-populate' {
   export interface Workbook {
     sheet(index: number): Sheet;

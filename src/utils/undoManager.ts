@@ -1,5 +1,7 @@
+// file to process undo functionality
 import { CrewMember, CrewInfo } from '../types/CTRTypes';
 
+// initialize object for state snapshot
 interface StateSnapshot {
   data: CrewMember[];
   crewInfo: CrewInfo;
@@ -13,6 +15,7 @@ interface StateSnapshot {
   customEntries: string[];
 }
 
+// undo manager class
 export class UndoManager {
   private history: StateSnapshot[] = [];
   private currentIndex: number = -1;
@@ -20,10 +23,12 @@ export class UndoManager {
   private lastRecordTime: number = 0;
   private minTimeBetweenRecords: number = 500; // Minimum time between records in milliseconds
 
+  // constructor for the undo manager
   constructor(initialState: StateSnapshot) {
     this.pushState(initialState);
   }
 
+  // push the state
   private pushState(state: StateSnapshot) {
     // Remove any future states if we're not at the end
     if (this.currentIndex < this.history.length - 1) {
@@ -44,6 +49,7 @@ export class UndoManager {
     this.lastRecordTime = Date.now();
   }
 
+  // clone the state
   private cloneState(state: StateSnapshot): StateSnapshot {
     return {
       data: JSON.parse(JSON.stringify(state.data)),
@@ -53,6 +59,7 @@ export class UndoManager {
     };
   }
 
+  // check if there is a significant change
   private hasSignificantChange(oldState: StateSnapshot, newState: StateSnapshot): boolean {
     // Check if the number of crew members has changed
     if (oldState.data.length !== newState.data.length) {
@@ -112,6 +119,7 @@ export class UndoManager {
     return false;
   }
 
+  // record the change
   public recordChange(newState: StateSnapshot) {
     const now = Date.now();
     const timeSinceLastRecord = now - this.lastRecordTime;
@@ -129,10 +137,12 @@ export class UndoManager {
     }
   }
 
+  // check if undo is possible
   public canUndo(): boolean {
     return this.currentIndex > 0;
   }
 
+  // undo the change
   public undo(): StateSnapshot | null {
     if (!this.canUndo()) {
       return null;
@@ -142,11 +152,13 @@ export class UndoManager {
     return this.cloneState(this.history[this.currentIndex]);
   }
 
+  // clear the history
   public clear() {
     this.history = [];
     this.currentIndex = -1;
   }
 
+  // get the current state
   public getCurrentState(): StateSnapshot | null {
     if (this.currentIndex >= 0) {
       return this.cloneState(this.history[this.currentIndex]);
