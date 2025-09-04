@@ -10,6 +10,7 @@ interface PrintableTableProps {
   crewInfo: CrewInfo;
   days: string[];
   onBeforePrint?: () => Promise<void> | void;
+  onShowNotification?: (message: string, type: 'success' | 'info' | 'warning' | 'error') => void;
 }
 
 // format the date
@@ -34,17 +35,43 @@ const generatePDFFromTable = async (tableHTML: string): Promise<void> => {
   // Create a temporary container with the table HTML
   const tempContainer = document.createElement('div');
   tempContainer.innerHTML = tableHTML;
-  tempContainer.style.position = 'absolute';
-  tempContainer.style.left = '-9999px';
+  
+  // Position container off-screen but still visible to html2pdf
+  tempContainer.style.position = 'fixed';
+  tempContainer.style.left = '0';
   tempContainer.style.top = '0';
-  tempContainer.style.width = '210mm'; // A4 width
+  tempContainer.style.width = 'auto';
+  tempContainer.style.height = 'auto';
   tempContainer.style.backgroundColor = '#ffffff';
-  tempContainer.style.color = '#000000'; // Ensure text is black
+  tempContainer.style.color = '#000000';
   tempContainer.style.fontFamily = 'Arial, sans-serif';
   tempContainer.style.fontSize = '6pt';
+  tempContainer.style.zIndex = '-1000';
+  tempContainer.style.opacity = '0.01'; // Nearly invisible but still rendered
+  tempContainer.style.pointerEvents = 'none';
+  
   document.body.appendChild(tempContainer);
 
   try {
+    // Wait a moment for the DOM to be ready
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Validate that content is actually visible
+    const hasVisibleContent = tempContainer.textContent && tempContainer.textContent.trim().length > 0;
+    const hasTableContent = tempContainer.querySelectorAll('table').length > 0;
+    
+    console.log('PDF generation debug:', {
+      hasVisibleContent,
+      hasTableContent,
+      textContentLength: tempContainer.textContent?.length || 0,
+      tableCount: tempContainer.querySelectorAll('table').length,
+      containerHTML: tempContainer.innerHTML.substring(0, 200) + '...'
+    });
+    
+    if (!hasVisibleContent || !hasTableContent) {
+      throw new Error('No visible content detected for PDF generation');
+    }
+
     // Configure html2pdf options to preserve margins and formatting
     const opt = {
       margin: [4.5, 3.5, 4.5, 3.5], // [top, right, bottom, left] in mm (matching @page margins)
@@ -59,22 +86,36 @@ const generatePDFFromTable = async (tableHTML: string): Promise<void> => {
         height: tempContainer.scrollHeight,
         scrollX: 0,
         scrollY: 0,
-        logging: false,
+        logging: true, // Enable logging for debugging
         // Ensure text rendering
         letterRendering: true,
-        // Force black text
+        // Force black text and ensure visibility
         onclone: (clonedDoc: Document) => {
           const clonedBody = clonedDoc.body;
           if (clonedBody) {
             clonedBody.style.color = '#000000';
             clonedBody.style.backgroundColor = '#ffffff';
+            clonedBody.style.fontFamily = 'Arial, sans-serif';
+            clonedBody.style.fontSize = '6pt';
+            
             // Ensure all text elements are visible
             const allElements = clonedBody.querySelectorAll('*');
             allElements.forEach((el: Element) => {
               if (el instanceof HTMLElement) {
                 el.style.color = '#000000';
                 el.style.backgroundColor = 'transparent';
+                // Ensure tables and cells are visible
+                if (el.tagName === 'TABLE' || el.tagName === 'TD' || el.tagName === 'TH') {
+                  el.style.border = '1px solid #000000';
+                  el.style.borderCollapse = 'collapse';
+                }
               }
+            });
+            
+            console.log('Cloned document prepared for PDF:', {
+              bodyColor: clonedBody.style.color,
+              bodyBackground: clonedBody.style.backgroundColor,
+              elementCount: allElements.length
             });
           }
         }
@@ -86,10 +127,20 @@ const generatePDFFromTable = async (tableHTML: string): Promise<void> => {
       }
     };
 
+    console.log('Starting PDF generation with options:', opt);
+    
     // Generate PDF using html2pdf
     await html2pdf().set(opt).from(tempContainer).save();
+    
+    console.log('PDF generation completed successfully');
+  } catch (error) {
+    console.error('PDF generation failed:', error);
+    throw error;
   } finally {
-    document.body.removeChild(tempContainer);
+    // Clean up the temporary container
+    if (tempContainer.parentNode) {
+      tempContainer.parentNode.removeChild(tempContainer);
+    }
   }
 };
 
@@ -488,6 +539,18 @@ const populateTemplateWithData = (template: string, data: CrewMember[], crewInfo
       }
     }
 
+    // Log the populated content for debugging
+    console.log('Template populated with data:', {
+      crewName: crewInfo.crewName,
+      crewNumber: crewInfo.crewNumber,
+      fireName: crewInfo.fireName,
+      fireNumber: crewInfo.fireNumber,
+      days: days,
+      dataLength: data.length,
+      validDataCount: data.filter(member => member.name || member.classification).length,
+      totalHours: calculateTotalHours(data)
+    });
+
     return tempDiv.innerHTML;
   } catch (error) {
     console.error('Error updating template:', error);
@@ -496,7 +559,7 @@ const populateTemplateWithData = (template: string, data: CrewMember[], crewInfo
 };
 
 // Function to render the PrintableTable component
-const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days, onBeforePrint }) => {
+const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days, onBeforePrint, onShowNotification }) => {
   const handleSendToPrinter = async () => {
     if (onBeforePrint) {
       await onBeforePrint();
@@ -509,16 +572,27 @@ const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days, o
       try {
         // Generate the template HTML first
         const template = generateTemplateHTML(data, crewInfo, days);
+        console.log('Template generated, length:', template.length);
         
         // Populate the template with data
         const populatedHTML = populateTemplateWithData(template, data, crewInfo, days);
+        console.log('Template populated, length:', populatedHTML.length);
+        
+        // Validate that we have data to work with
+        if (!data || data.length === 0) {
+          console.warn('No crew data available for PDF generation');
+          onShowNotification?.('No crew data available for printing', 'warning');
+          return;
+        }
         
         // Generate PDF from the populated template
         await generatePDFFromTable(populatedHTML);
         
         console.log('PDF generated successfully for iOS device');
+        onShowNotification?.('PDF generated successfully', 'success');
       } catch (error) {
         console.error('PDF generation failed:', error);
+        onShowNotification?.('PDF generation failed. Falling back to HTML printing.', 'error');
         // Fall back to HTML printing if PDF generation fails
         console.log('Falling back to HTML printing');
         handleHTMLPrint();
@@ -580,6 +654,8 @@ const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days, o
       }, 500);
     };
   };
+
+
 
   return (
     <button onClick={handleSendToPrinter} className="ctr-btn print-btn">

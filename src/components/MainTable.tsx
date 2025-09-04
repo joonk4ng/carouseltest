@@ -2045,6 +2045,7 @@ export default function MainTable() {
             }} 
             days={days} 
             onBeforePrint={sneakySave}
+            onShowNotification={showNotification}
           />
         </div>
         <div style={{ display: 'flex', flexDirection: 'row', gap: '24px', alignItems: 'stretch', width: '100%' }}>
