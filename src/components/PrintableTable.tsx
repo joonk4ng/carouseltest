@@ -2,8 +2,7 @@
 import React from 'react';
 import { CrewMember, CrewInfo } from '../types/CTRTypes';
 import { calculateTotalHours } from '../utils/timeCalculations';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
+import html2pdf from 'html2pdf.js';
 
 // PrintableTableProps interface
 interface PrintableTableProps {
@@ -24,8 +23,14 @@ const formatDate = (dateStr: string): string => {
   return dateStr;
 };
 
-// Generate PDF from HTML template for iOS compatibility
-const generatePDFFromTable = async (tableHTML: string): Promise<jsPDF> => {
+// Detect if device is iOS (iPhone/iPad)
+const isIOSDevice = (): boolean => {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+};
+
+// Generate PDF from HTML template using html2pdf for iOS compatibility
+const generatePDFFromTable = async (tableHTML: string): Promise<void> => {
   // Create a temporary container with the table HTML
   const tempContainer = document.createElement('div');
   tempContainer.innerHTML = tableHTML;
@@ -34,61 +39,55 @@ const generatePDFFromTable = async (tableHTML: string): Promise<jsPDF> => {
   tempContainer.style.top = '0';
   tempContainer.style.width = '210mm'; // A4 width
   tempContainer.style.backgroundColor = '#ffffff';
+  tempContainer.style.color = '#000000'; // Ensure text is black
+  tempContainer.style.fontFamily = 'Arial, sans-serif';
+  tempContainer.style.fontSize = '6pt';
   document.body.appendChild(tempContainer);
 
   try {
-    // Convert HTML to canvas with high quality
-    const canvas = await html2canvas(tempContainer, {
-      scale: 2, // Higher resolution for print quality
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: '#ffffff',
-      width: tempContainer.scrollWidth,
-      height: tempContainer.scrollHeight,
-      scrollX: 0,
-      scrollY: 0,
-      logging: false // Disable logging for production
-    });
+    // Configure html2pdf options to preserve margins and formatting
+    const opt = {
+      margin: [4.5, 3.5, 4.5, 3.5], // [top, right, bottom, left] in mm (matching @page margins)
+      filename: 'crew-time-report.pdf',
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { 
+        scale: 2, // Higher resolution for print quality
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        width: tempContainer.scrollWidth,
+        height: tempContainer.scrollHeight,
+        scrollX: 0,
+        scrollY: 0,
+        logging: false,
+        // Ensure text rendering
+        letterRendering: true,
+        // Force black text
+        onclone: (clonedDoc: Document) => {
+          const clonedBody = clonedDoc.body;
+          if (clonedBody) {
+            clonedBody.style.color = '#000000';
+            clonedBody.style.backgroundColor = '#ffffff';
+            // Ensure all text elements are visible
+            const allElements = clonedBody.querySelectorAll('*');
+            allElements.forEach((el: Element) => {
+              if (el instanceof HTMLElement) {
+                el.style.color = '#000000';
+                el.style.backgroundColor = 'transparent';
+              }
+            });
+          }
+        }
+      },
+      jsPDF: { 
+        unit: 'mm', 
+        format: 'a4', 
+        orientation: 'portrait' 
+      }
+    };
 
-    // Create PDF with exact dimensions
-    const imgWidth = 210; // A4 width in mm
-    const pageHeight = 297; // A4 height in mm
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    
-    // Add margins to the PDF (matching the @page margins from the template)
-    const marginTop = 4.5; // 0.45cm in mm
-    const marginLeft = 3.5; // 0.35cm in mm
-    const marginRight = 3.5;
-    const marginBottom = 4.5;
-    
-    const contentWidth = imgWidth - marginLeft - marginRight;
-    const contentHeight = imgHeight;
-    
-    // Calculate how many pages we need
-    const pagesNeeded = Math.ceil(contentHeight / (pageHeight - marginTop - marginBottom));
-    
-    for (let i = 0; i < pagesNeeded; i++) {
-      if (i > 0) pdf.addPage();
-      
-      const sourceY = i * (pageHeight - marginTop - marginBottom) * (canvas.height / contentHeight);
-      const sourceHeight = Math.min(
-        (pageHeight - marginTop - marginBottom) * (canvas.height / contentHeight),
-        canvas.height - sourceY
-      );
-      
-      pdf.addImage(
-        canvas,
-        'PNG',
-        marginLeft,
-        marginTop,
-        contentWidth,
-        contentHeight
-      );
-    }
-
-    return pdf;
+    // Generate PDF using html2pdf
+    await html2pdf().set(opt).from(tempContainer).save();
   } finally {
     document.body.removeChild(tempContainer);
   }
@@ -112,6 +111,8 @@ const generateTemplateHTML = (data: CrewMember[], crewInfo: CrewInfo, days: stri
             font-size: 6pt;
             margin: 0;
             padding: 0;
+            color: #000000 !important;
+            background-color: #ffffff !important;
         }
 
         .back-btn {
@@ -196,6 +197,8 @@ const generateTemplateHTML = (data: CrewMember[], crewInfo: CrewInfo, days: stri
             text-overflow: ellipsis;
             line-height: 1;
             height: 0.435cm;
+            color: #000000 !important;
+            background-color: transparent !important;
         }
 
         thead th {
@@ -325,7 +328,6 @@ const generateTemplateHTML = (data: CrewMember[], crewInfo: CrewInfo, days: stri
             <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
             <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
             <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
         </tbody>
     </table>
 
@@ -350,209 +352,199 @@ const generateTemplateHTML = (data: CrewMember[], crewInfo: CrewInfo, days: stri
   return template;
 };
 
+// Function to populate HTML template with data
+const populateTemplateWithData = (template: string, data: CrewMember[], crewInfo: CrewInfo, days: string[]): string => {
+  // Create a temporary div to parse the HTML
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = template;
+
+  try {
+    // Update crew info - first table
+    const firstTable = tempDiv.querySelector('.header-table');
+    if (firstTable) {
+      const cells = firstTable.querySelectorAll('td');
+      if (cells[0]) cells[0].textContent = crewInfo.crewName || 'Dust Busters Plus LLC';
+      if (cells[1]) cells[1].textContent = crewInfo.crewNumber || '';
+    }
+
+    // Update fire info - second table
+    const tables = tempDiv.querySelectorAll('.header-table');
+    if (tables[1]) {
+      const cells = tables[1].querySelectorAll('td');
+      if (cells[1]) cells[1].textContent = `${crewInfo.fireName || ''}`;
+      if (cells[2]) cells[2].textContent = `${crewInfo.fireNumber || ''}`;
+    }
+
+    // Update dates - third table
+    if (tables[2]) {
+      const cells = tables[2].querySelectorAll('td');
+      if (cells[1]) cells[1].textContent = formatDate(days[0] || '');
+      if (cells[2]) cells[2].textContent = formatDate(days[1] || '');
+    }
+
+    // Get the main table and its rows
+    const allTables = tempDiv.querySelectorAll('table');
+    const mainTable = allTables[allTables.length - 2]; // Get the second to last table (time-table)
+    if (mainTable) {
+      // First, ensure thead row is empty
+      const theadRow = mainTable.querySelector('thead tr');
+      if (theadRow) {
+        const headerCells = theadRow.querySelectorAll('th');
+        headerCells.forEach(cell => {
+          cell.textContent = '';
+        });
+      }
+
+      // Then handle tbody rows
+      const tbodyRows = mainTable.querySelectorAll('tbody tr');
+      
+      // Filter out empty rows from the data
+      const validData = data.filter(member => member.name || member.classification);
+
+      // iterate through the tbody rows
+      tbodyRows.forEach((row, index) => {
+        const cells = row.querySelectorAll('td');
+        // if the row does not have enough cells, return
+        if (cells.length < 7) {
+          console.warn(`Row ${index} does not have enough cells`);
+          return;
+        }
+
+        // get the member data
+        const member = validData[index];
+
+        try {
+          // if we have data for this row, update it
+          if (member && member.name) {
+            // Only populate rows that have actual data
+            cells[0].textContent = ''; // Leave the first column empty
+            cells[1].textContent = member.name;
+            cells[2].textContent = member.classification;
+            cells[3].textContent = member.days[0]?.on || '';
+            cells[4].textContent = member.days[0]?.off || '';
+            cells[5].textContent = member.days[1]?.on || '';
+            cells[6].textContent = member.days[1]?.off || '';
+          } else {
+            // Clear the row if no data
+            cells.forEach(cell => {
+              cell.textContent = '';
+            });
+          }
+        } catch (err) {
+          console.error(`Error updating row ${index}:`, err);
+        }
+      });
+    }
+
+    // Update remarks table
+    const remarksTable = tempDiv.querySelector('.remarks-table');
+    if (remarksTable) {
+      const remarksTbody = remarksTable.querySelector('tbody');
+      if (remarksTbody) {
+        const remarks: string[] = [];
+        
+        // Calculate total hours using the existing function
+        const totalHours = calculateTotalHours(data);
+        const formattedTotalHours = totalHours.toFixed(2);
+
+        // First content row (actually second row) will be HOTLINE/Travel + Total Hours
+        const firstRowText = crewInfo.checkboxStates?.hotline ? 'HOTLINE' : 
+                            (crewInfo.checkboxStates?.travel ? 'Travel' : '');
+        const firstContentRow = `<tr><td style="text-align: left; padding-left: 0.5cm; height: 0.435cm;"><span style="display: inline-block; margin-right: 5.5cm;">${firstRowText}</span>Total Hours: ${formattedTotalHours}</td></tr>`;
+        
+        // Add checkbox-based remarks
+        if (crewInfo.checkboxStates?.noMealsLodging && crewInfo.checkboxStates?.noMeals) {
+          remarks.push('Self Sufficient - No Meals & No Lodging Provided');
+        } else if (crewInfo.checkboxStates?.noMealsLodging) {
+          remarks.push('Self Sufficient - No Meals Provided');
+        } else if (crewInfo.checkboxStates?.noMeals) {
+          remarks.push('Self Sufficient - No Lodging Provided');
+        }
+        if (crewInfo.checkboxStates?.travel && crewInfo.checkboxStates?.hotline) remarks.push('Travel');
+        if (crewInfo.checkboxStates?.noLunch) remarks.push('No Lunch Taken due to Uncontrolled Fire Line');
+
+        // Add custom entries if they exist
+        if (crewInfo.customEntries?.length) {
+          remarks.push(...crewInfo.customEntries);
+        }
+
+        // Create rows for remaining remarks (up to 5 rows since first content row is used for status)
+        const remarksHtml = remarks
+          .slice(0, 5)
+          .map(remark => `<tr><td style="text-align: left; padding-left: 0.5cm; height: 0.435cm;">${remark}</td></tr>`)
+          .join('');
+
+        // Fill remaining rows with empty cells if needed
+        const emptyRowsNeeded = 5 - Math.min(remarks.length, 5);
+        const emptyRows = Array(emptyRowsNeeded > 0 ? emptyRowsNeeded : 0)
+          .fill('<tr><td style="text-align: left; padding-left: 0.5cm; height: 0.435cm;"></td></tr>')
+          .join('');
+
+        // Combine all rows with a blank first row
+        remarksTbody.innerHTML = `<tr><td style="text-align: left; height: 0.435cm;"></td></tr>` + 
+                               firstContentRow + 
+                               remarksHtml + 
+                               emptyRows;
+      }
+    }
+
+    return tempDiv.innerHTML;
+  } catch (error) {
+    console.error('Error updating template:', error);
+    return template;
+  }
+};
+
 // Function to render the PrintableTable component
 const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days, onBeforePrint }) => {
-  const handlePrint = async () => {
+  const handleSendToPrinter = async () => {
     if (onBeforePrint) {
       await onBeforePrint();
     }
 
-    // Detect iOS devices
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    
-    if (isIOS) {
-      // Use PDF generation for iOS devices
+    // Check if device is iOS
+    if (isIOSDevice()) {
+      console.log('iOS device detected - using PDF generation for printing');
+      
       try {
-        console.log('iOS device detected - using PDF generation for printing');
-        
         // Generate the template HTML first
         const template = generateTemplateHTML(data, crewInfo, days);
         
-        // Generate PDF from the template
-        const pdf = await generatePDFFromTable(template);
+        // Populate the template with data
+        const populatedHTML = populateTemplateWithData(template, data, crewInfo, days);
         
-        // Save the PDF and open for printing
-        const pdfBlob = pdf.output('blob');
-        const url = URL.createObjectURL(pdfBlob);
+        // Generate PDF from the populated template
+        await generatePDFFromTable(populatedHTML);
         
-        // Open PDF in new window for printing
-        const pdfWindow = window.open(url, '_blank');
-        if (pdfWindow) {
-          pdfWindow.onload = () => {
-            setTimeout(() => {
-              pdfWindow.print();
-              // Clean up URL after printing
-              setTimeout(() => {
-                URL.revokeObjectURL(url);
-              }, 1000);
-            }, 500);
-          };
-        } else {
-          // Fallback: trigger download
-          pdf.save('crew-time-report.pdf');
-        }
-        
-        return;
+        console.log('PDF generated successfully for iOS device');
       } catch (error) {
         console.error('PDF generation failed:', error);
-        // Fall back to HTML printing
+        // Fall back to HTML printing if PDF generation fails
         console.log('Falling back to HTML printing');
+        handleHTMLPrint();
       }
+    } else {
+      // Use HTML printing for non-iOS devices
+      console.log('Non-iOS device detected - using HTML printing');
+      handleHTMLPrint();
     }
+  };
 
-    // Use existing HTML approach for non-iOS devices or fallback
+  const handleHTMLPrint = () => {
+    // Use existing HTML approach for printing
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
     // Generate the HTML template
     const template = generateTemplateHTML(data, crewInfo, days);
+    
+    // Populate the template with data
+    const populatedHTML = populateTemplateWithData(template, data, crewInfo, days);
 
-    // Create a temporary div to parse the HTML
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = template;
-
-    // Wait for the content to be parsed
-    setTimeout(() => {
-      try {
-        // Update crew info - first table
-        const firstTable = tempDiv.querySelector('.header-table');
-        if (firstTable) {
-          const cells = firstTable.querySelectorAll('td');
-          if (cells[0]) cells[0].textContent = crewInfo.crewName || 'Dust Busters Plus LLC';
-          if (cells[1]) cells[1].textContent = crewInfo.crewNumber || '';
-        }
-
-        // Update fire info - second table
-        const tables = tempDiv.querySelectorAll('.header-table');
-        if (tables[1]) {
-          const cells = tables[1].querySelectorAll('td');
-          if (cells[1]) cells[1].textContent = `${crewInfo.fireName || ''}`;
-          if (cells[2]) cells[2].textContent = `${crewInfo.fireNumber || ''}`;
-        }
-
-        // Update dates - third table
-        if (tables[2]) {
-          const cells = tables[2].querySelectorAll('td');
-          if (cells[1]) cells[1].textContent = formatDate(days[0] || '');
-          if (cells[2]) cells[2].textContent = formatDate(days[1] || '');
-        }
-
-        // Get the main table and its rows
-        const allTables = tempDiv.querySelectorAll('table');
-        const mainTable = allTables[allTables.length - 2]; // Get the second to last table (time-table)
-        if (mainTable) {
-          // First, ensure thead row is empty
-          const theadRow = mainTable.querySelector('thead tr');
-          if (theadRow) {
-            const headerCells = theadRow.querySelectorAll('th');
-            headerCells.forEach(cell => {
-              cell.textContent = '';
-            });
-          }
-
-          // Then handle tbody rows
-          const tbodyRows = mainTable.querySelectorAll('tbody tr');
-          
-          // Filter out empty rows from the data
-          const validData = data.filter(member => member.name || member.classification);
-
-          // iterate through the tbody rows
-          tbodyRows.forEach((row, index) => {
-            const cells = row.querySelectorAll('td');
-            // if the row does not have enough cells, return
-            if (cells.length < 7) {
-              console.warn(`Row ${index} does not have enough cells`);
-              return;
-            }
-
-            // get the member data
-            const member = validData[index];
-
-            try {
-              // if we have data for this row, update it
-              if (member && member.name) {
-                // Only populate rows that have actual data
-                cells[0].textContent = ''; // Leave the first column empty
-                cells[1].textContent = member.name;
-                cells[2].textContent = member.classification;
-                cells[3].textContent = member.days[0]?.on || '';
-                cells[4].textContent = member.days[0]?.off || '';
-                cells[5].textContent = member.days[1]?.on || '';
-                cells[6].textContent = member.days[1]?.off || '';
-              } else {
-                // Clear the row if no data
-                cells.forEach(cell => {
-                  cell.textContent = '';
-                });
-              }
-            } catch (err) {
-              console.error(`Error updating row ${index}:`, err);
-            }
-          });
-        }
-
-        // Update remarks table
-        const remarksTable = tempDiv.querySelector('.remarks-table');
-        if (remarksTable) {
-          const remarksTbody = remarksTable.querySelector('tbody');
-          if (remarksTbody) {
-            const remarks: string[] = [];
-            
-            // Calculate total hours using the existing function
-            const totalHours = calculateTotalHours(data);
-            const formattedTotalHours = totalHours.toFixed(2);
-
-            // First content row (actually second row) will be HOTLINE/Travel + Total Hours
-            const firstRowText = crewInfo.checkboxStates?.hotline ? 'HOTLINE' : 
-                                (crewInfo.checkboxStates?.travel ? 'Travel' : '');
-            const firstContentRow = `<tr><td style="text-align: left; padding-left: 0.5cm; height: 0.435cm;"><span style="display: inline-block; margin-right: 5.5cm;">${firstRowText}</span>Total Hours: ${formattedTotalHours}</td></tr>`;
-            
-            // Add checkbox-based remarks
-            if (crewInfo.checkboxStates?.noMealsLodging && crewInfo.checkboxStates?.noMeals) {
-              remarks.push('Self Sufficient - No Meals & No Lodging Provided');
-            } else if (crewInfo.checkboxStates?.noMealsLodging) {
-              remarks.push('Self Sufficient - No Meals Provided');
-            } else if (crewInfo.checkboxStates?.noMeals) {
-              remarks.push('Self Sufficient - No Lodging Provided');
-            }
-            if (crewInfo.checkboxStates?.travel && crewInfo.checkboxStates?.hotline) remarks.push('Travel');
-            if (crewInfo.checkboxStates?.noLunch) remarks.push('No Lunch Taken due to Uncontrolled Fire Line');
-
-            // Add custom entries if they exist
-            if (crewInfo.customEntries?.length) {
-              remarks.push(...crewInfo.customEntries);
-            }
-
-            // Create rows for remaining remarks (up to 5 rows since first content row is used for status)
-            const remarksHtml = remarks
-              .slice(0, 5)
-              .map(remark => `<tr><td style="text-align: left; padding-left: 0.5cm; height: 0.435cm;">${remark}</td></tr>`)
-              .join('');
-
-            // Fill remaining rows with empty cells if needed
-            const emptyRowsNeeded = 5 - Math.min(remarks.length, 5);
-            const emptyRows = Array(emptyRowsNeeded > 0 ? emptyRowsNeeded : 0)
-              .fill('<tr><td style="text-align: left; padding-left: 0.5cm; height: 0.435cm;"></td></tr>')
-              .join('');
-
-            // Combine all rows with a blank first row
-            remarksTbody.innerHTML = `<tr><td style="text-align: left; height: 0.435cm;"></td></tr>` + 
-                                   firstContentRow + 
-                                   remarksHtml + 
-                                   emptyRows;
-          }
-        }
-
-                // Write the modified content to the new window
-        printWindow.document.write('<!DOCTYPE html>');
-        printWindow.document.write(tempDiv.innerHTML);
-        printWindow.document.close();
-        
-      } catch (error) {
-        console.error('Error updating template:', error);
-        printWindow.close();
-      }
-    }, 100); // Small delay to ensure DOM is parsed
+    // Write the modified content to the new window
+    printWindow.document.write('<!DOCTYPE html>');
+    printWindow.document.write(populatedHTML);
+    printWindow.document.close();
         
     // Ensure the buttons are visible by adding them again if needed
     setTimeout(() => {
@@ -590,7 +582,7 @@ const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days, o
   };
 
   return (
-    <button onClick={handlePrint} className="ctr-btn print-btn">
+    <button onClick={handleSendToPrinter} className="ctr-btn print-btn">
       Send to Printer
     </button>
   );
