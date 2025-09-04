@@ -1,0 +1,2 @@
+import{g as c}from"./vendor-3f8dbcd3.js";import{r as f}from"./main-a96cc3eb.js";function l(r,n){for(var o=0;o<n.length;o++){const e=n[o];if(typeof e!="string"&&!Array.isArray(e)){for(const t in e)if(t!=="default"&&!(t in r)){const a=Object.getOwnPropertyDescriptor(e,t);a&&Object.defineProperty(r,t,a.get?a:{enumerable:!0,get:()=>e[t]})}}}return Object.freeze(Object.defineProperty(r,Symbol.toStringTag,{value:"Module"}))}var s=f();const i=c(s),u=l({__proto__:null,default:i},[s]);export{u as h};
+//# sourceMappingURL=html2canvas-e00f2514.js.map

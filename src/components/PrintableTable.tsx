@@ -30,118 +30,141 @@ const isIOSDevice = (): boolean => {
          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 };
 
-// Generate PDF from HTML template using html2pdf for iOS compatibility
-const generatePDFFromTable = async (tableHTML: string): Promise<void> => {
-  // Create a temporary container with the table HTML
+// Generate PDF using the simple POC approach
+const generatePDF = async (data: CrewMember[], crewInfo: CrewInfo, days: string[]): Promise<void> => {
+  // Create a temporary container in the actual DOM
   const tempContainer = document.createElement('div');
-  tempContainer.innerHTML = tableHTML;
-  
-  // Position container off-screen but still visible to html2pdf
+  tempContainer.id = 'pdf-container';
   tempContainer.style.position = 'fixed';
   tempContainer.style.left = '0';
   tempContainer.style.top = '0';
-  tempContainer.style.width = 'auto';
-  tempContainer.style.height = 'auto';
+  tempContainer.style.width = '210mm';
   tempContainer.style.backgroundColor = '#ffffff';
   tempContainer.style.color = '#000000';
   tempContainer.style.fontFamily = 'Arial, sans-serif';
   tempContainer.style.fontSize = '6pt';
-  tempContainer.style.zIndex = '-1000';
-  tempContainer.style.opacity = '0.01'; // Nearly invisible but still rendered
-  tempContainer.style.pointerEvents = 'none';
+  tempContainer.style.zIndex = '1000';
+  tempContainer.style.padding = '0.45cm 0.35cm';
   
+  // Add the container to the body
   document.body.appendChild(tempContainer);
 
   try {
-    // Wait a moment for the DOM to be ready
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    // Validate that content is actually visible
-    const hasVisibleContent = tempContainer.textContent && tempContainer.textContent.trim().length > 0;
-    const hasTableContent = tempContainer.querySelectorAll('table').length > 0;
-    
-    console.log('PDF generation debug:', {
-      hasVisibleContent,
-      hasTableContent,
-      textContentLength: tempContainer.textContent?.length || 0,
-      tableCount: tempContainer.querySelectorAll('table').length,
-      containerHTML: tempContainer.innerHTML.substring(0, 200) + '...'
-    });
-    
-    if (!hasVisibleContent || !hasTableContent) {
-      throw new Error('No visible content detected for PDF generation');
-    }
+    // Populate the container with the crew data
+    populateContainerWithData(tempContainer, data, crewInfo, days);
 
-    // Configure html2pdf options to preserve margins and formatting
-    const opt = {
-      margin: [4.5, 3.5, 4.5, 3.5], // [top, right, bottom, left] in mm (matching @page margins)
+    // Hide buttons temporarily for PDF generation
+    const buttons = document.querySelectorAll('.back-btn, .print-btn, .pdf-btn');
+    buttons.forEach(btn => (btn as HTMLElement).style.display = 'none');
+
+    // Configure PDF options (same as your POC)
+    const options = {
+      margin: [0.45, 0.35, 0.45, 0.35], // top, right, bottom, left in cm
       filename: 'crew-time-report.pdf',
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { 
-        scale: 2, // Higher resolution for print quality
+        scale: 2,
         useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        width: tempContainer.scrollWidth,
-        height: tempContainer.scrollHeight,
-        scrollX: 0,
-        scrollY: 0,
-        logging: true, // Enable logging for debugging
-        // Ensure text rendering
-        letterRendering: true,
-        // Force black text and ensure visibility
-        onclone: (clonedDoc: Document) => {
-          const clonedBody = clonedDoc.body;
-          if (clonedBody) {
-            clonedBody.style.color = '#000000';
-            clonedBody.style.backgroundColor = '#ffffff';
-            clonedBody.style.fontFamily = 'Arial, sans-serif';
-            clonedBody.style.fontSize = '6pt';
-            
-            // Ensure all text elements are visible
-            const allElements = clonedBody.querySelectorAll('*');
-            allElements.forEach((el: Element) => {
-              if (el instanceof HTMLElement) {
-                el.style.color = '#000000';
-                el.style.backgroundColor = 'transparent';
-                // Ensure tables and cells are visible
-                if (el.tagName === 'TABLE' || el.tagName === 'TD' || el.tagName === 'TH') {
-                  el.style.border = '1px solid #000000';
-                  el.style.borderCollapse = 'collapse';
-                }
-              }
-            });
-            
-            console.log('Cloned document prepared for PDF:', {
-              bodyColor: clonedBody.style.color,
-              bodyBackground: clonedBody.style.backgroundColor,
-              elementCount: allElements.length
-            });
-          }
-        }
+        letterRendering: true
       },
       jsPDF: { 
-        unit: 'mm', 
+        unit: 'cm', 
         format: 'a4', 
         orientation: 'portrait' 
       }
     };
 
-    console.log('Starting PDF generation with options:', opt);
-    
-    // Generate PDF using html2pdf
-    await html2pdf().set(opt).from(tempContainer).save();
-    
-    console.log('PDF generation completed successfully');
-  } catch (error) {
-    console.error('PDF generation failed:', error);
-    throw error;
+    // Generate PDF using the container
+    await html2pdf()
+      .from(tempContainer)
+      .set(options)
+      .save();
+
+    console.log('PDF generated successfully');
+
   } finally {
-    // Clean up the temporary container
+    // Clean up: remove the temporary container and show buttons again
     if (tempContainer.parentNode) {
       tempContainer.parentNode.removeChild(tempContainer);
     }
+    
+    // Show buttons again
+    const buttons = document.querySelectorAll('.back-btn, .print-btn, .pdf-btn');
+    buttons.forEach(btn => (btn as HTMLElement).style.display = 'block');
   }
+};
+
+// Populate the container with crew data
+const populateContainerWithData = (container: HTMLElement, data: CrewMember[], crewInfo: CrewInfo, days: string[]): void => {
+  // Calculate total hours
+  const totalHours = calculateTotalHours(data);
+  const formattedTotalHours = totalHours.toFixed(2);
+
+  // Build the HTML content
+  const htmlContent = `
+    <div style="text-align: center; font-weight: bold; margin-bottom: 0.5cm;">
+      ${crewInfo.crewName || 'Dust Busters Plus LLC'}
+    </div>
+    
+    <div style="margin-bottom: 0.3cm;">
+      <div style="text-align: right; margin-bottom: 0.2cm;">
+        Fire: ${crewInfo.fireName || ''} | Number: ${crewInfo.fireNumber || ''}
+      </div>
+      <div style="text-align: right; margin-bottom: 0.2cm;">
+        Dates: ${formatDate(days[0] || '')} to ${formatDate(days[1] || '')}
+      </div>
+    </div>
+
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 0.5cm;">
+      <thead>
+        <tr style="background-color: #f0f0f0;">
+          <th style="border: 1px solid #000; padding: 0.2cm; width: 0.9cm;">No</th>
+          <th style="border: 1px solid #000; padding: 0.2cm; width: 4.25cm;">Name</th>
+          <th style="border: 1px solid #000; padding: 0.2cm; width: 1.15cm;">Class</th>
+          <th style="border: 1px solid #000; padding: 0.2cm; width: 0.95cm;">On</th>
+          <th style="border: 1px solid #000; padding: 0.2cm; width: 0.95cm;">Off</th>
+          <th style="border: 1px solid #000; padding: 0.2cm; width: 0.95cm;">On</th>
+          <th style="border: 1px solid #000; padding: 0.2cm; width: 0.95cm;">Off</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${data.filter(member => member.name || member.classification).map((member, index) => `
+          <tr>
+            <td style="border: 1px solid #000; padding: 0.2cm; text-align: center;">${index + 1}</td>
+            <td style="border: 1px solid #000; padding: 0.2cm; text-align: center;">${member.name || ''}</td>
+            <td style="border: 1px solid #000; padding: 0.2cm; text-align: center;">${member.classification || ''}</td>
+            <td style="border: 1px solid #000; padding: 0.2cm; text-align: center;">${member.days[0]?.on || ''}</td>
+            <td style="border: 1px solid #000; padding: 0.2cm; text-align: center;">${member.days[0]?.off || ''}</td>
+            <td style="border: 1px solid #000; padding: 0.2cm; text-align: center;">${member.days[1]?.on || ''}</td>
+            <td style="border: 1px solid #000; padding: 0.2cm; text-align: center;">${member.days[1]?.off || ''}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+
+    <div style="margin-top: 0.5cm;">
+      <div style="margin-bottom: 0.2cm;">
+        <strong>Total Hours: ${formattedTotalHours}</strong>
+      </div>
+      
+      ${crewInfo.checkboxStates?.hotline ? '<div>HOTLINE</div>' : ''}
+      ${crewInfo.checkboxStates?.travel ? '<div>Travel</div>' : ''}
+      
+      ${crewInfo.checkboxStates?.noMealsLodging && crewInfo.checkboxStates?.noMeals ? 
+        '<div>Self Sufficient - No Meals & No Lodging Provided</div>' : ''}
+      ${crewInfo.checkboxStates?.noMealsLodging && !crewInfo.checkboxStates?.noMeals ? 
+        '<div>Self Sufficient - No Meals Provided</div>' : ''}
+      ${!crewInfo.checkboxStates?.noMealsLodging && crewInfo.checkboxStates?.noMeals ? 
+        '<div>Self Sufficient - No Lodging Provided</div>' : ''}
+      
+      ${crewInfo.checkboxStates?.noLunch ? '<div>No Lunch Taken due to Uncontrolled Fire Line</div>' : ''}
+      
+      ${crewInfo.customEntries?.map(entry => `<div>${entry}</div>`).join('') || ''}
+    </div>
+  `;
+
+  // Set the HTML content
+  container.innerHTML = htmlContent;
 };
 
 // Generate the HTML template with data
@@ -570,14 +593,6 @@ const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days, o
       console.log('iOS device detected - using PDF generation for printing');
       
       try {
-        // Generate the template HTML first
-        const template = generateTemplateHTML(data, crewInfo, days);
-        console.log('Template generated, length:', template.length);
-        
-        // Populate the template with data
-        const populatedHTML = populateTemplateWithData(template, data, crewInfo, days);
-        console.log('Template populated, length:', populatedHTML.length);
-        
         // Validate that we have data to work with
         if (!data || data.length === 0) {
           console.warn('No crew data available for PDF generation');
@@ -585,8 +600,8 @@ const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days, o
           return;
         }
         
-        // Generate PDF from the populated template
-        await generatePDFFromTable(populatedHTML);
+        // Generate PDF using the simple approach
+        await generatePDF(data, crewInfo, days);
         
         console.log('PDF generated successfully for iOS device');
         onShowNotification?.('PDF generated successfully', 'success');
