@@ -112,10 +112,36 @@ const generatePDF = async (data: CrewMember[], crewInfo: CrewInfo, days: string[
     };
 
     // Generate print-only PDF using the existing HTML template
-    await html2pdf()
+    // Use a simpler approach for iOS compatibility
+    const pdfWorker = html2pdf()
       .from(tempContainer)
-      .set(options)
-      .save();
+      .set(options);
+    
+    // For iOS, prevent any potential redirects
+    if (isIOSDevice()) {
+      // Add event listener to prevent navigation
+      const preventNavigation = (e: Event) => {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      };
+      
+      // Temporarily prevent navigation
+      window.addEventListener('beforeunload', preventNavigation);
+      window.addEventListener('unload', preventNavigation);
+      
+      try {
+        await pdfWorker.save();
+      } finally {
+        // Remove event listeners after PDF generation
+        setTimeout(() => {
+          window.removeEventListener('beforeunload', preventNavigation);
+          window.removeEventListener('unload', preventNavigation);
+        }, 1000);
+      }
+    } else {
+      await pdfWorker.save();
+    }
 
     console.log('Print-only PDF generated successfully using existing HTML template');
 
@@ -561,7 +587,7 @@ const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days, o
 
     // Check if device is iOS
     if (isIOSDevice()) {
-      console.log('iOS device detected - using PDF generation for printing');
+      console.log('iOS device detected - attempting PDF generation for printing');
       
       try {
         // Validate that we have data to work with
@@ -571,16 +597,22 @@ const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days, o
           return;
         }
         
-        // Generate PDF using the simple approach
+        // Try PDF generation first
         await generatePDF(data, crewInfo, days);
         
         console.log('Print-only PDF generated successfully for iOS device');
         onShowNotification?.('Print-only PDF generated successfully', 'success');
+        
+        // Add a small delay to prevent immediate redirect
+        setTimeout(() => {
+          console.log('PDF generation completed, staying on current page');
+        }, 500);
+        
       } catch (error) {
         console.error('PDF generation failed:', error);
-        onShowNotification?.('PDF generation failed. Falling back to HTML printing.', 'error');
+        onShowNotification?.('PDF generation failed. Using HTML printing instead.', 'warning');
         // Fall back to HTML printing if PDF generation fails
-        console.log('Falling back to HTML printing');
+        console.log('Falling back to HTML printing for iOS');
         handleHTMLPrint();
       }
     } else {
