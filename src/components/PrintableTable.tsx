@@ -30,19 +30,21 @@ const isIOSDevice = (): boolean => {
          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 };
 
-// Generate PDF using the existing HTML template (iOS path)
+// Generate print-only PDF using the existing HTML template (iOS path)
 const generatePDF = async (data: CrewMember[], crewInfo: CrewInfo, days: string[]): Promise<void> => {
   // Create a temporary container in the actual DOM
   const tempContainer = document.createElement('div');
   tempContainer.id = 'pdf-container';
   tempContainer.style.position = 'fixed';
-  tempContainer.style.left = '0';
+  tempContainer.style.left = '-9999px'; // Move off-screen instead of hidden
   tempContainer.style.top = '0';
-  tempContainer.style.width = '100%';
-  tempContainer.style.height = '100%';
+  tempContainer.style.width = '210mm'; // A4 width
+  tempContainer.style.minHeight = '297mm'; // A4 height
   tempContainer.style.backgroundColor = '#ffffff';
   tempContainer.style.zIndex = '1000';
-  tempContainer.style.overflow = 'hidden';
+  tempContainer.style.overflow = 'visible'; // Allow content to be visible
+  tempContainer.style.fontFamily = 'Arial, sans-serif';
+  tempContainer.style.fontSize = '6pt';
   
   // Add the container to the body
   document.body.appendChild(tempContainer);
@@ -55,21 +57,52 @@ const generatePDF = async (data: CrewMember[], crewInfo: CrewInfo, days: string[
     // Set the populated HTML content to the container
     tempContainer.innerHTML = populatedHTML;
 
+    // Wait for DOM to render
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     // Hide buttons temporarily for PDF generation
     const buttons = document.querySelectorAll('.back-btn, .print-btn, .pdf-btn');
     buttons.forEach(btn => (btn as HTMLElement).style.display = 'none');
 
+    // Add print-specific styles to make content visible
+    const printStyle = document.createElement('style');
+    printStyle.id = 'pdf-print-style';
+    printStyle.textContent = `
+      #pdf-container * {
+        visibility: visible !important;
+        color: #000000 !important;
+        background-color: transparent !important;
+      }
+      #pdf-container th {
+        visibility: visible !important;
+        border: 1px solid #000 !important;
+      }
+      #pdf-container td {
+        border: 1px solid #000 !important;
+        height: auto !important;
+        min-height: 20px !important;
+      }
+      #pdf-container .back-btn,
+      #pdf-container .print-btn {
+        display: none !important;
+      }
+    `;
+    document.head.appendChild(printStyle);
+
     // Configure PDF options optimized for iOS
     const options = {
       margin: [0.45, 0.35, 0.45, 0.35], // top, right, bottom, left in cm
-      filename: 'crew-time-report.pdf',
+      filename: 'crew-time-report-print-only.pdf', // Clarify this is print-only
       image: { type: 'jpeg', quality: 0.95 },
       html2canvas: { 
         scale: 1.5, // Reduced scale for iOS compatibility
         useCORS: true,
         letterRendering: true,
         allowTaint: true,
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
+        logging: true, // Enable logging for debugging
+        width: tempContainer.scrollWidth,
+        height: tempContainer.scrollHeight
       },
       jsPDF: { 
         unit: 'cm', 
@@ -78,18 +111,24 @@ const generatePDF = async (data: CrewMember[], crewInfo: CrewInfo, days: string[
       }
     };
 
-    // Generate PDF using the existing HTML template
+    // Generate print-only PDF using the existing HTML template
     await html2pdf()
       .from(tempContainer)
       .set(options)
       .save();
 
-    console.log('PDF generated successfully using existing HTML template');
+    console.log('Print-only PDF generated successfully using existing HTML template');
 
   } finally {
-    // Clean up: remove the temporary container and show buttons again
+    // Clean up: remove the temporary container and styles
     if (tempContainer.parentNode) {
       tempContainer.parentNode.removeChild(tempContainer);
+    }
+    
+    // Remove print-specific styles
+    const printStyle = document.getElementById('pdf-print-style');
+    if (printStyle) {
+      printStyle.remove();
     }
     
     // Show buttons again
@@ -535,8 +574,8 @@ const PrintableTable: React.FC<PrintableTableProps> = ({ data, crewInfo, days, o
         // Generate PDF using the simple approach
         await generatePDF(data, crewInfo, days);
         
-        console.log('PDF generated successfully for iOS device');
-        onShowNotification?.('PDF generated successfully', 'success');
+        console.log('Print-only PDF generated successfully for iOS device');
+        onShowNotification?.('Print-only PDF generated successfully', 'success');
       } catch (error) {
         console.error('PDF generation failed:', error);
         onShowNotification?.('PDF generation failed. Falling back to HTML printing.', 'error');
