@@ -30,7 +30,7 @@ const isIOSDevice = (): boolean => {
          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 };
 
-// Generate PDF using the simple POC approach
+// Generate PDF using the existing HTML template (iOS path)
 const generatePDF = async (data: CrewMember[], crewInfo: CrewInfo, days: string[]): Promise<void> => {
   // Create a temporary container in the actual DOM
   const tempContainer = document.createElement('div');
@@ -38,34 +38,38 @@ const generatePDF = async (data: CrewMember[], crewInfo: CrewInfo, days: string[
   tempContainer.style.position = 'fixed';
   tempContainer.style.left = '0';
   tempContainer.style.top = '0';
-  tempContainer.style.width = '210mm';
+  tempContainer.style.width = '100%';
+  tempContainer.style.height = '100%';
   tempContainer.style.backgroundColor = '#ffffff';
-  tempContainer.style.color = '#000000';
-  tempContainer.style.fontFamily = 'Arial, sans-serif';
-  tempContainer.style.fontSize = '6pt';
   tempContainer.style.zIndex = '1000';
-  tempContainer.style.padding = '0.45cm 0.35cm';
+  tempContainer.style.overflow = 'hidden';
   
   // Add the container to the body
   document.body.appendChild(tempContainer);
 
   try {
-    // Populate the container with the crew data
-    populateContainerWithData(tempContainer, data, crewInfo, days);
+    // Use the existing HTML template and populate it with data
+    const template = generateTemplateHTML(data, crewInfo, days);
+    const populatedHTML = populateTemplateWithData(template, data, crewInfo, days);
+    
+    // Set the populated HTML content to the container
+    tempContainer.innerHTML = populatedHTML;
 
     // Hide buttons temporarily for PDF generation
     const buttons = document.querySelectorAll('.back-btn, .print-btn, .pdf-btn');
     buttons.forEach(btn => (btn as HTMLElement).style.display = 'none');
 
-    // Configure PDF options (same as your POC)
+    // Configure PDF options optimized for iOS
     const options = {
       margin: [0.45, 0.35, 0.45, 0.35], // top, right, bottom, left in cm
       filename: 'crew-time-report.pdf',
-      image: { type: 'jpeg', quality: 0.98 },
+      image: { type: 'jpeg', quality: 0.95 },
       html2canvas: { 
-        scale: 2,
+        scale: 1.5, // Reduced scale for iOS compatibility
         useCORS: true,
-        letterRendering: true
+        letterRendering: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff'
       },
       jsPDF: { 
         unit: 'cm', 
@@ -74,13 +78,13 @@ const generatePDF = async (data: CrewMember[], crewInfo: CrewInfo, days: string[
       }
     };
 
-    // Generate PDF using the container
+    // Generate PDF using the existing HTML template
     await html2pdf()
       .from(tempContainer)
       .set(options)
       .save();
 
-    console.log('PDF generated successfully');
+    console.log('PDF generated successfully using existing HTML template');
 
   } finally {
     // Clean up: remove the temporary container and show buttons again
@@ -94,78 +98,6 @@ const generatePDF = async (data: CrewMember[], crewInfo: CrewInfo, days: string[
   }
 };
 
-// Populate the container with crew data
-const populateContainerWithData = (container: HTMLElement, data: CrewMember[], crewInfo: CrewInfo, days: string[]): void => {
-  // Calculate total hours
-  const totalHours = calculateTotalHours(data);
-  const formattedTotalHours = totalHours.toFixed(2);
-
-  // Build the HTML content
-  const htmlContent = `
-    <div style="text-align: center; font-weight: bold; margin-bottom: 0.5cm;">
-      ${crewInfo.crewName || 'Dust Busters Plus LLC'}
-    </div>
-    
-    <div style="margin-bottom: 0.3cm;">
-      <div style="text-align: right; margin-bottom: 0.2cm;">
-        Fire: ${crewInfo.fireName || ''} | Number: ${crewInfo.fireNumber || ''}
-      </div>
-      <div style="text-align: right; margin-bottom: 0.2cm;">
-        Dates: ${formatDate(days[0] || '')} to ${formatDate(days[1] || '')}
-      </div>
-    </div>
-
-    <table style="width: 100%; border-collapse: collapse; margin-bottom: 0.5cm;">
-      <thead>
-        <tr style="background-color: #f0f0f0;">
-          <th style="border: 1px solid #000; padding: 0.2cm; width: 0.9cm;">No</th>
-          <th style="border: 1px solid #000; padding: 0.2cm; width: 4.25cm;">Name</th>
-          <th style="border: 1px solid #000; padding: 0.2cm; width: 1.15cm;">Class</th>
-          <th style="border: 1px solid #000; padding: 0.2cm; width: 0.95cm;">On</th>
-          <th style="border: 1px solid #000; padding: 0.2cm; width: 0.95cm;">Off</th>
-          <th style="border: 1px solid #000; padding: 0.2cm; width: 0.95cm;">On</th>
-          <th style="border: 1px solid #000; padding: 0.2cm; width: 0.95cm;">Off</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${data.filter(member => member.name || member.classification).map((member, index) => `
-          <tr>
-            <td style="border: 1px solid #000; padding: 0.2cm; text-align: center;">${index + 1}</td>
-            <td style="border: 1px solid #000; padding: 0.2cm; text-align: center;">${member.name || ''}</td>
-            <td style="border: 1px solid #000; padding: 0.2cm; text-align: center;">${member.classification || ''}</td>
-            <td style="border: 1px solid #000; padding: 0.2cm; text-align: center;">${member.days[0]?.on || ''}</td>
-            <td style="border: 1px solid #000; padding: 0.2cm; text-align: center;">${member.days[0]?.off || ''}</td>
-            <td style="border: 1px solid #000; padding: 0.2cm; text-align: center;">${member.days[1]?.on || ''}</td>
-            <td style="border: 1px solid #000; padding: 0.2cm; text-align: center;">${member.days[1]?.off || ''}</td>
-          </tr>
-        `).join('')}
-      </tbody>
-    </table>
-
-    <div style="margin-top: 0.5cm;">
-      <div style="margin-bottom: 0.2cm;">
-        <strong>Total Hours: ${formattedTotalHours}</strong>
-      </div>
-      
-      ${crewInfo.checkboxStates?.hotline ? '<div>HOTLINE</div>' : ''}
-      ${crewInfo.checkboxStates?.travel ? '<div>Travel</div>' : ''}
-      
-      ${crewInfo.checkboxStates?.noMealsLodging && crewInfo.checkboxStates?.noMeals ? 
-        '<div>Self Sufficient - No Meals & No Lodging Provided</div>' : ''}
-      ${crewInfo.checkboxStates?.noMealsLodging && !crewInfo.checkboxStates?.noMeals ? 
-        '<div>Self Sufficient - No Meals Provided</div>' : ''}
-      ${!crewInfo.checkboxStates?.noMealsLodging && crewInfo.checkboxStates?.noMeals ? 
-        '<div>Self Sufficient - No Lodging Provided</div>' : ''}
-      
-      ${crewInfo.checkboxStates?.noLunch ? '<div>No Lunch Taken due to Uncontrolled Fire Line</div>' : ''}
-      
-      ${crewInfo.customEntries?.map(entry => `<div>${entry}</div>`).join('') || ''}
-    </div>
-  `;
-
-  // Set the HTML content
-  container.innerHTML = htmlContent;
-};
 
 // Generate the HTML template with data
 const generateTemplateHTML = (data: CrewMember[], crewInfo: CrewInfo, days: string[]): string => {
